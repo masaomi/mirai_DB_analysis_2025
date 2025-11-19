@@ -8,3 +8,4 @@ chromadb
 boto3
 sentence-transformers
 pydantic
+tqdm
