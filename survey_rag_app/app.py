@@ -12,9 +12,10 @@ from langchain_core.runnables import RunnablePassthrough
 # Configuration
 CHROMA_DB_DIR = "./chroma_db"
 COLLECTION_NAME = "survey_responses"
+EMBEDDING_MODEL = "intfloat/multilingual-e5-base"  # Multilingual model for better Japanese support
 
 def get_embeddings():
-    return HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+    return HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL)
 
 def get_vectorstore():
     if not os.path.exists(CHROMA_DB_DIR):
@@ -27,9 +28,12 @@ def get_vectorstore():
     )
 
 def init_page():
-    st.set_page_config(page_title="Survey RAG Chat", layout="wide")
-    st.title("📊 Survey Data RAG Chat")
-    st.markdown("Ask questions based on the survey responses database.")
+    st.set_page_config(page_title="仮想回答代表者AI", layout="wide")
+    st.title("💬 仮想回答代表者AI")
+    st.markdown("""
+    このAIは、**65,234件のアンケート回答**を代表する仮想的なスポークスパーソンです。  
+    実際の回答データに基づいて、多様な意見や傾向を「私たち」の視点でお答えします。
+    """)
 
 def sidebar_config():
     st.sidebar.header("LLM Configuration")
@@ -86,7 +90,23 @@ def get_llm(config):
             return None
 
 def format_docs(docs):
-    return "\n\n".join(doc.page_content for doc in docs)
+    """Format documents with metadata for better context"""
+    formatted = []
+    for i, doc in enumerate(docs, 1):
+        topic = doc.metadata.get('topic', '不明')
+        content = doc.page_content
+        formatted.append(f"【回答例{i}】（トピック: {topic}）\n{content}")
+    return "\n\n".join(formatted)
+
+def get_response_stats(docs):
+    """Get statistics about retrieved documents"""
+    topics = [doc.metadata.get('topic', '不明') for doc in docs]
+    from collections import Counter
+    topic_counts = Counter(topics)
+    return {
+        'total': len(docs),
+        'topics': dict(topic_counts)
+    }
 
 def main():
     init_page()
@@ -108,7 +128,7 @@ def main():
             st.markdown(message["content"])
 
     # Chat Input
-    if prompt := st.chat_input("What would you like to know about the survey results?"):
+    if prompt := st.chat_input("アンケート回答者に何を聞きたいですか？（例：国会議員定数削減についてどう思いますか？）"):
         # Add user message to state
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"):
@@ -120,29 +140,66 @@ def main():
             if not llm:
                 st.stop()
                 
-            retriever = vectorstore.as_retriever(search_kwargs={"k": 5})
+            retriever = vectorstore.as_retriever(search_kwargs={"k": 8})
             
-            # Create a simple RAG chain
-            template = """Answer the question based only on the following context:
+            # Retrieve relevant documents
+            retrieved_docs = retriever.invoke(prompt)
+            stats = get_response_stats(retrieved_docs)
+            context = format_docs(retrieved_docs)
+            
+            # Enhanced prompt for virtual representative persona
+            template = """あなたは、各種アンケート調査に回答した65,234人の意見を代表する仮想的なスポークスパーソンです。
+
+【あなたの役割】
+- 実際のアンケート回答データに基づいて回答する
+- 多数派の意見だけでなく、多様な視点や少数意見も考慮する
+- 「私たち回答者は」という視点で語る
+- データにない情報については推測せず、正直に「データにはありません」と答える
+
+【参考にする実際の回答】
+以下は、あなたの質問に関連する実際のアンケート回答です：
+
 {context}
 
-Question: {question}
+【統計情報】
+- 参照した回答数: {num_responses}件
+- 関連トピック: {topics}
 
-Answer: """
+【質問】
+{question}
+
+【回答】
+上記の実際の回答を踏まえ、回答者を代表する立場として、以下のように答えます："""
             
-            prompt_template = PromptTemplate.from_template(template)
+            prompt_template = PromptTemplate.from_template(
+                template,
+                partial_variables={
+                    "num_responses": str(stats['total']),
+                    "topics": ", ".join(stats['topics'].keys())
+                }
+            )
             
             rag_chain = (
-                {"context": retriever | format_docs, "question": RunnablePassthrough()}
+                {"context": lambda x: context, "question": RunnablePassthrough()}
                 | prompt_template
                 | llm
                 | StrOutputParser()
             )
             
-            with st.spinner("Thinking..."):
+            with st.spinner("回答者の意見を集約しています..."):
                 try:
                     result = rag_chain.invoke(prompt)
+                    
+                    # Display the answer
                     st.markdown(result)
+                    
+                    # Show statistics in an expander
+                    with st.expander("📊 参照した回答の詳細"):
+                        st.write(f"**参照回答数**: {stats['total']}件")
+                        st.write("**トピック分布**:")
+                        for topic, count in stats['topics'].items():
+                            st.write(f"- {topic}: {count}件")
+                    
                     st.session_state.messages.append({"role": "assistant", "content": result})
                 except Exception as e:
                     st.error(f"An error occurred: {e}")
