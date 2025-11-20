@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>アンケート回答分析 - カテゴリ別パイチャート</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Hiragino Sans', 'Yu Gothic', 'Meiryo', sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+
+        header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        header p {
+            font-size: 1.1rem;
+            opacity: 0.95;
+        }
+
+        .content {
+            padding: 40px;
+        }
+
+        .section {
+            margin-bottom: 50px;
+        }
+
+        .section h2 {
+            font-size: 1.8rem;
+            color: #667eea;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #667eea;
+        }
+
+        .section h3 {
+            font-size: 1.4rem;
+            color: #764ba2;
+            margin: 25px 0 15px 0;
+        }
+
+        .info-box {
+            background: #f8f9ff;
+            border-left: 4px solid #667eea;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+        }
+
+        .info-box h4 {
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 1.2rem;
+        }
+
+        .info-box ul {
+            margin-left: 20px;
+        }
+
+        .info-box li {
+            margin: 8px 0;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin: 30px 0;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 12px;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .stat-card .number {
+            font-size: 2.5rem;
+            font-weight: bold;
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .stat-card .label {
+            font-size: 0.95rem;
+            opacity: 0.95;
+        }
+
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 40px;
+            margin-top: 30px;
+        }
+
+        .chart-item {
+            background: white;
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            padding: 20px;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .chart-item:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+            border-color: #667eea;
+        }
+
+        .chart-item h3 {
+            color: #333;
+            margin: 0 0 15px 0;
+            font-size: 1.3rem;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+
+        .chart-item img {
+            width: 100%;
+            height: auto;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+
+        .chart-item img:hover {
+            transform: scale(1.02);
+        }
+
+        .chart-info {
+            margin-top: 15px;
+            padding: 15px;
+            background: #f8f9ff;
+            border-radius: 8px;
+            font-size: 0.95rem;
+        }
+
+        .chart-info .response-count {
+            font-weight: bold;
+            color: #667eea;
+            font-size: 1.1rem;
+        }
+
+        .methodology {
+            background: #fff9e6;
+            border-left: 4px solid #ffc107;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+        }
+
+        .methodology h4 {
+            color: #f57c00;
+            margin-bottom: 10px;
+        }
+
+        footer {
+            background: #f5f5f5;
+            padding: 30px;
+            text-align: center;
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal img {
+            max-width: 95%;
+            max-height: 95vh;
+            border-radius: 8px;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .close-modal {
+            position: absolute;
+            top: 30px;
+            right: 40px;
+            color: white;
+            font-size: 40px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        @media (max-width: 768px) {
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+
+            header h1 {
+                font-size: 1.8rem;
+            }
+
+            .content {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📊 アンケート回答分析レポート</h1>
+            <p>自由記述回答のカテゴリ別分析とビジュアライゼーション</p>
+            <p style="font-size: 0.9rem; margin-top: 10px;">分析日: 2025年11月20日</p>
+        </header>
+
+        <div class="content">
+            <!-- 概要セクション -->
+            <div class="section">
+                <h2>📈 分析概要</h2>
+                <p>このレポートは、各種アンケートの自由記述回答をキーワードベースで自動カテゴリ化し、その分布を可視化したものです。</p>
+                
+                <div class="stats">
+                    <div class="stat-card">
+                        <span class="number">12</span>
+                        <span class="label">分析アンケート数</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="number">62,692</span>
+                        <span class="label">総回答数</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="number">8</span>
+                        <span class="label">主要カテゴリ</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カテゴリ化方針 -->
+            <div class="section">
+                <h2>🎯 カテゴリ化の方針</h2>
+                
+                <div class="info-box">
+                    <h4>基本的なアプローチ</h4>
+                    <p>各アンケートの性質に応じて、最も重要だと思われる視点でキーワードベースのカテゴリ化を実施しました。</p>
+                </div>
+
+                <h3>1. チームみらい関連アンケート (plan2026, plan2026-public)</h3>
+                <div class="methodology">
+                    <p><strong>対象:</strong> チームみらいの1年プランに関する意見・提案</p>
+                    <p><strong>カテゴリ:</strong></p>
+                    <ul>
+                        <li><strong>選挙・議席獲得</strong> - 議席、選挙、候補などのキーワード</li>
+                        <li><strong>DX・デジタル化</strong> - デジタル、システム、IT、オンラインなど</li>
+                        <li><strong>透明性・情報公開</strong> - 透明、公開、見える化、可視化など</li>
+                        <li><strong>政治資金の透明化</strong> - 政治資金、献金、お金、資金など</li>
+                        <li><strong>汚職・不正の撲滅</strong> - 汚職、不正、腐敗、癒着など</li>
+                        <li><strong>国民生活の改善</strong> - 国民、庶民、市民、生活、暮らしなど</li>
+                        <li><strong>平和・安全保障</strong> - 平和、戦争、防衛、安全保障など</li>
+                        <li><strong>その他の意見</strong> - 上記に該当しない意見</li>
+                    </ul>
+                </div>
+
+                <h3>2. 船荷証券の電子化法案 (bill-of-lading)</h3>
+                <div class="methodology">
+                    <p><strong>対象:</strong> 国際貿易における船荷証券の電子化についての意見</p>
+                    <p><strong>カテゴリ:</strong></p>
+                    <ul>
+                        <li><strong>賛成・肯定的</strong> - 賛成、良い、メリット、効率など</li>
+                        <li><strong>反対・否定的</strong> - 反対、懸念、心配、リスクなど</li>
+                        <li><strong>セキュリティ関連</strong> - セキュリティ、安全、保護など</li>
+                        <li><strong>コスト関連</strong> - コスト、費用、経費など</li>
+                        <li><strong>実務・運用面</strong> - 実務、実装、運用、導入など</li>
+                        <li><strong>その他</strong> - 上記に該当しない意見</li>
+                    </ul>
+                </div>
+
+                <h3>3. 定数削減議論 (teisuu)</h3>
+                <div class="methodology">
+                    <p><strong>対象:</strong> 国会議員の定数削減に関する意見</p>
+                    <p><strong>カテゴリ:</strong></p>
+                    <ul>
+                        <li><strong>政治・政策関連</strong> - 議員、国会、政治など</li>
+                        <li><strong>期待・要望</strong> - 賛成、削減すべきなど</li>
+                        <li><strong>課題・懸念</strong> - 反対、懸念など</li>
+                        <li><strong>その他</strong> - 一般的な意見</li>
+                    </ul>
+                </div>
+
+                <h3>4. その他のアンケート</h3>
+                <div class="methodology">
+                    <p><strong>まる見え政治資金、みらい議会、AIプランなど:</strong></p>
+                    <ul>
+                        <li><strong>政治・政策関連</strong> - 政治、政策、議員などのキーワード</li>
+                        <li><strong>透明性・情報公開</strong> - 透明性、情報公開、DXなど</li>
+                        <li><strong>期待・要望</strong> - ポジティブな意見や期待</li>
+                        <li><strong>課題・懸念</strong> - 課題や懸念事項</li>
+                        <li><strong>具体的な提案</strong> - 実装や改善の具体提案</li>
+                        <li><strong>その他</strong> - 分類外の意見</li>
+                    </ul>
+                </div>
+
+                <div class="info-box">
+                    <h4>注意事項</h4>
+                    <ul>
+                        <li>カテゴリ化は自動化されており、キーワードベースで判定しています</li>
+                        <li>一つの回答が複数のキーワードを含む場合、最初にマッチしたカテゴリに分類されます</li>
+                        <li>「その他」カテゴリには、短い回答や特定のキーワードが含まれない回答が含まれます</li>
+                        <li>テスト回答や意味のない短文（「test」「あああ」など）は事前に除外されています</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- パイチャート一覧 -->
+            <div class="section">
+                <h2>📊 カテゴリ別パイチャート一覧</h2>
+                <p>各画像をクリックすると拡大表示されます。</p>
+
+                <div class="charts-grid">
+                    <!-- チームみらい1年プラン（公開版） -->
+                    <div class="chart-item">
+                        <h3>『チームみらい』1年プラン（公開版）</h3>
+                        <img src="pie_chart_plan2026-public.png" alt="チームみらい1年プラン公開版" onclick="openModal(this.src)">
+                        <div class="chart-info">
+                            <div class="response-count">📝 25,180 回答</div>
+                            <p>最も多く寄せられたアンケート。DX推進、透明性向上、選挙戦略などに関する具体的な期待が集まっています。</p>
+                        </div>
+                    </div>
+
+                    <!-- 定数削減議論 -->
+                    <div class="chart-item">
+                        <h3>国会議員定数削減議論</h3>
+                        <img src="pie_chart_teisuu.png" alt="定数削減議論" onclick="openModal(this.src)">
+                        <div class="chart-info">
+                            <div class="response-count">📝 15,743 回答</div>
+                            <p>政治・政策に関する意見が最多。賛成・反対の両論が活発に議論されています。</p>
+                        </div>
+                    </div>
+
+                    <!-- AIプランテスト -->
+                    <div class="chart-item">
+                        <h3>AIプラン（テスト）</h3>
+                        <img src="pie_chart_ai-plan-test.png" alt="AIプランテスト" onclick="openModal(this.src)">
+                        <div class="chart-info">
+                            <div class="response-count">📝 14,762 回答</div>
+                            <p>AI活用に関する期待、課題、具体的な提案が多数寄せられています。</p>
+                        </div>
+                    </div>
+
+                    <!-- 船荷証券の電子化 -->
+                    <div class="chart-item">
+                        <h3>船荷証券の電子化法案</h3>
+                        <img src="pie_chart_bill-of-lading.png" alt="船荷証券の電子化" onclick="openModal(this.src)">
+                        <div class="chart-info">
+                            <div class="response-count">📝 2,887 回答</div>
+                            <p>国際貿易のデジタル化について、賛成意見が多い一方、セキュリティやコストへの懸念も見られます。</p>
+                        </div>
+                    </div>
+
+                    <!-- チームみらい1年プラン -->
+                    <div class="chart-item">
+                        <h3>『チームみらい』1年プラン</h3>
+                        <img src="pie_chart_plan2026.png" alt="チームみらい1年プラン" onclick="openModal(this.src)">
+                        <div class="chart-info">
+                            <div class="response-count">📝 2,453 回答</div>
+                            <p>DX推進、透明性、選挙戦略など多角的な意見が集まっています。</p>
+                        </div>
+                    </div>
+
+                    <!-- みらい議会インタビュー -->
+                    <div class="chart-item">
+                        <h3>みらい議会インタビュー</h3>
+                        <img src="pie_chart_mirai-gikai-interview.png" alt="みらい議会インタビュー" onclick="openModal(this.src)">
+                        <div class="chart-info">
+                            <div class="response-count">📝 783 回答</div>
+                            <p>政治・政策関連の意見が半数以上。期待や具体的な改善提案も多数寄せられています。</p>
+                        </div>
+                    </div>
+
+                    <!-- まる見え政治資金（ユーザー） -->
+                    <div class="chart-item">
+                        <h3>まる見え政治資金（ユーザーフィードバック）</h3>
+                        <img src="pie_chart_marumie-shikin-user.png" alt="まる見え政治資金ユーザー" onclick="openModal(this.src)">
+                        <div class="chart-info">
+                            <div class="response-count">📝 645 回答</div>
+                            <p>政治資金の可視化ツールに対するユーザーからのフィードバック。</p>
+                        </div>
+                    </div>
+
+                    <!-- プロダクトリサーチ -->
+                    <div class="chart-item">
+                        <h3>プロダクトリサーチ</h3>
+                        <img src="pie_chart_product-research.png" alt="プロダクトリサーチ" onclick="openModal(this.src)">
+                        <div class="chart-info">
+                            <div class="response-count">📝 91 回答</div>
+                            <p>プロダクト開発における課題や改善提案が中心。</p>
+                        </div>
+                    </div>
+
+                    <!-- カスタマーフィードバック -->
+                    <div class="chart-item">
+                        <h3>カスタマーフィードバック</h3>
+                        <img src="pie_chart_customer-feedback.png" alt="カスタマーフィードバック" onclick="openModal(this.src)">
+                        <div class="chart-info">
+                            <div class="response-count">📝 53 回答</div>
+                            <p>AIインタビューシステムに対するユーザー体験のフィードバック。</p>
+                        </div>
+                    </div>
+
+                    <!-- まる見え政治資金（開発者） -->
+                    <div class="chart-item">
+                        <h3>まる見え政治資金（開発者インタビュー）</h3>
+                        <img src="pie_chart_marumie-shikin.png" alt="まる見え政治資金開発者" onclick="openModal(this.src)">
+                        <div class="chart-info">
+                            <div class="response-count">📝 40 回答</div>
+                            <p>開発者の視点からの意見や技術的な課題について。</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 分析手法 -->
+            <div class="section">
+                <h2>🔧 分析手法・技術情報</h2>
+                
+                <div class="info-box">
+                    <h4>使用技術</h4>
+                    <ul>
+                        <li><strong>プログラミング言語:</strong> Python 3.10</li>
+                        <li><strong>データ処理:</strong> JSON形式のデータベースバックアップファイル</li>
+                        <li><strong>可視化:</strong> Matplotlib（日本語フォント: Hiragino Sans）</li>
+                        <li><strong>カテゴリ化:</strong> キーワードベースのルールエンジン</li>
+                    </ul>
+                </div>
+
+                <div class="info-box">
+                    <h4>データ処理フロー</h4>
+                    <ol>
+                        <li>JSONデータからセッション情報とメッセージを抽出</li>
+                        <li>ユーザー回答（role: "user"）のみを抽出</li>
+                        <li>テスト回答や意味のない短文を除外</li>
+                        <li>アンケートの種類（slug）別に回答を分類</li>
+                        <li>各アンケートに適したカテゴリ化ルールを適用</li>
+                        <li>カテゴリ別の回答数を集計</li>
+                        <li>パイチャートを生成（300dpi、高解像度）</li>
+                    </ol>
+                </div>
+
+                <div class="info-box">
+                    <h4>分析スクリプト</h4>
+                    <p>分析に使用したPythonスクリプトは同じフォルダ内の <code>create_pie_charts.py</code> にあります。</p>
+                    <p>実行方法:</p>
+                    <pre style="background: #f5f5f5; padding: 10px; border-radius: 5px; overflow-x: auto;">
+conda activate mirai_db_analysis_py3.10
+python create_pie_charts.py
+                    </pre>
+                </div>
+            </div>
+
+            <!-- まとめ -->
+            <div class="section">
+                <h2>💡 主要な発見</h2>
+                
+                <div class="info-box">
+                    <h4>1. チームみらい関連</h4>
+                    <p>最も多くの回答が集まったのは「チームみらい1年プラン」関連のアンケート（合計27,633回答）。DX推進と透明性向上への期待が特に高い。</p>
+                </div>
+
+                <div class="info-box">
+                    <h4>2. 定数削減議論</h4>
+                    <p>15,743回答と活発な議論。政治・政策に関する意見が多く、賛成・反対の両論が見られる。</p>
+                </div>
+
+                <div class="info-box">
+                    <h4>3. 船荷証券の電子化</h4>
+                    <p>専門的なテーマながら2,887回答。賛成意見が多いものの、セキュリティやコストへの懸念も具体的に指摘されている。</p>
+                </div>
+
+                <div class="info-box">
+                    <h4>4. プロダクト開発系</h4>
+                    <p>みらい議会やまる見え政治資金などのプロダクトに対して、具体的な改善提案や期待が多数寄せられている。</p>
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            <p><strong>アンケート回答分析レポート</strong></p>
+            <p>分析日: 2025年11月20日 | データソース: backup-2025-11-14T03-19-14.json</p>
+            <p>総回答数: 62,692件 | 分析アンケート数: 12種類</p>
+        </footer>
+    </div>
+
+    <!-- モーダル -->
+    <div id="modal" class="modal" onclick="closeModal()">
+        <span class="close-modal">&times;</span>
+        <img id="modal-img" src="" alt="拡大表示">
+    </div>
+
+    <script>
+        function openModal(src) {
+            const modal = document.getElementById('modal');
+            const modalImg = document.getElementById('modal-img');
+            modal.classList.add('active');
+            modalImg.src = src;
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('modal');
+            modal.classList.remove('active');
+        }
+
+        // ESCキーでモーダルを閉じる
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                closeModal();
+            }
+        });
+    </script>
+</body>
+</html>
+
