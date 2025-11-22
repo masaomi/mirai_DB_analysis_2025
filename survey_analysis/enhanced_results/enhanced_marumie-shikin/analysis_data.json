@@ -1,0 +1,361 @@
+{
+  "slug": "marumie-shikin",
+  "config_title": "「みらいまる見え政治資金」開発に関するインタビュー",
+  "total_responses": 40,
+  "summary": "このアンケートには40件の回答があり、9つのカテゴリに分類されました。最も多いカテゴリは「カシ・ヨイ・デキル」で、全体の45.0%を占めています。",
+  "top_keywords": [
+    [
+      "ワカル",
+      0.10040304983270723
+    ],
+    [
+      "ナイ",
+      0.07523629091725428
+    ],
+    [
+      "オモウ",
+      0.06415535958615459
+    ],
+    [
+      "アル",
+      0.06081184067511193
+    ],
+    [
+      "イウ",
+      0.052204389099253956
+    ],
+    [
+      "ヨイ",
+      0.05012841294035284
+    ],
+    [
+      "ゴザル",
+      0.05
+    ],
+    [
+      "カシ",
+      0.047188983626061734
+    ],
+    [
+      "セイジ",
+      0.046674771925808343
+    ],
+    [
+      "デキル",
+      0.04509149098979415
+    ],
+    [
+      "コト",
+      0.03866804667259362
+    ],
+    [
+      "ヤル",
+      0.03704344572790111
+    ],
+    [
+      "ナル",
+      0.03467112305018788
+    ],
+    [
+      "ギジュツ",
+      0.03391756657100477
+    ],
+    [
+      "リヨウ",
+      0.03244347462762189
+    ],
+    [
+      "シル",
+      0.032157692022564854
+    ],
+    [
+      "センモン",
+      0.03191842848120892
+    ],
+    [
+      "ショルイ",
+      0.02980415440261979
+    ],
+    [
+      "アリガ",
+      0.025614096617239592
+    ],
+    [
+      "クレル",
+      0.024870964156065947
+    ]
+  ],
+  "top_topics": [
+    [
+      "politics",
+      6
+    ],
+    [
+      "transparency",
+      5
+    ],
+    [
+      "society",
+      1
+    ],
+    [
+      "money",
+      1
+    ],
+    [
+      "corruption",
+      1
+    ],
+    [
+      "efficiency",
+      1
+    ]
+  ],
+  "categories": {
+    "english・could・please": {
+      "count": 2,
+      "sentiment": {
+        "positive": 0,
+        "negative": 0,
+        "neutral": 2,
+        "positive_pct": 0.0,
+        "negative_pct": 0.0,
+        "neutral_pct": 100.0
+      },
+      "intent": {
+        "desire_count": 0,
+        "concern_count": 0,
+        "proposal_count": 0
+      },
+      "keywords": [
+        "english",
+        "could",
+        "please",
+        "in",
+        "you"
+      ],
+      "sample_responses": [
+        "Could you please speak in English?",
+        "Could you please speak in English?"
+      ]
+    },
+    "better・for・is": {
+      "count": 2,
+      "sentiment": {
+        "positive": 0,
+        "negative": 0,
+        "neutral": 2,
+        "positive_pct": 0.0,
+        "negative_pct": 0.0,
+        "neutral_pct": 100.0
+      },
+      "intent": {
+        "desire_count": 0,
+        "concern_count": 0,
+        "proposal_count": 0
+      },
+      "keywords": [
+        "better",
+        "for",
+        "is",
+        "it",
+        "me"
+      ],
+      "sample_responses": [
+        "it is better for me.",
+        "it is better for me."
+      ]
+    },
+    "カシ・ヨイ・デキル": {
+      "count": 18,
+      "sentiment": {
+        "positive": 3,
+        "negative": 1,
+        "neutral": 14,
+        "positive_pct": 16.666666666666664,
+        "negative_pct": 5.555555555555555,
+        "neutral_pct": 77.77777777777779
+      },
+      "intent": {
+        "desire_count": 1,
+        "concern_count": 0,
+        "proposal_count": 0
+      },
+      "keywords": [
+        "カシ",
+        "ヨイ",
+        "デキル",
+        "イウ",
+        "ソウサ"
+      ],
+      "sample_responses": [
+        "こんにちは",
+        "最初の要件定義では、関係者と一緒にビジョンや目的を明確にし、ユーザーストーリーを洗い出しました。ステークホルダーからの要望を整理して優先順位を付け、MVPを定義しました。",
+        "部外者です",
+        "政治資金がわかれば裏金とかも予防できるのでおかしな利権とかもなくなりそう",
+        "素晴らしい。"
+      ]
+    },
+    "ナイ・アル・ツカウ": {
+      "count": 6,
+      "sentiment": {
+        "positive": 1,
+        "negative": 0,
+        "neutral": 5,
+        "positive_pct": 16.666666666666664,
+        "negative_pct": 0.0,
+        "neutral_pct": 83.33333333333334
+      },
+      "intent": {
+        "desire_count": 0,
+        "concern_count": 0,
+        "proposal_count": 0
+      },
+      "keywords": [
+        "ナイ",
+        "アル",
+        "ツカウ",
+        "サイト",
+        "ゼンシン"
+      ],
+      "sample_responses": [
+        "プロジェクトには、昨年から開発に参加しています。このプロジェクトは社会課題に取り組むもので、とてもやりがいがあると感じました。初めて聞いたときは、透明性を高めるための技術的な挑戦が多そうだと感じました。",
+        "サイトとしてとても見やすいし、今までにない形で良いと思う",
+        "逆にどんな案がありますか？",
+        "完全でなくても一歩前進として意味がある",
+        "クレカ使って、専用でやらないと罰則になるくらいの強制力がなければ使わない"
+      ]
+    },
+    "ワカル・オモシロイ・バカ": {
+      "count": 4,
+      "sentiment": {
+        "positive": 0,
+        "negative": 1,
+        "neutral": 3,
+        "positive_pct": 0.0,
+        "negative_pct": 25.0,
+        "neutral_pct": 75.0
+      },
+      "intent": {
+        "desire_count": 0,
+        "concern_count": 0,
+        "proposal_count": 0
+      },
+      "keywords": [
+        "ワカル",
+        "オモシロイ",
+        "バカ",
+        "ギジュツ",
+        "ムズカシイ"
+      ],
+      "sample_responses": [
+        "とても分かりやすくて面白い",
+        "課題はわからないですね。専門家ではありませんから。ただ、現金をもらう。という部分においては、取締りするのが難しいですね。また、法人を立てられたりして、収入・支出関連が別枠で行われたら、難しいですね。この辺の課題解決がわからないです。",
+        "技術的？馬鹿だからわかんない🤣🙏",
+        "それもよくわかんない🙏"
+      ]
+    },
+    "ショルイ・ワタス・リヨウ": {
+      "count": 3,
+      "sentiment": {
+        "positive": 0,
+        "negative": 0,
+        "neutral": 3,
+        "positive_pct": 0.0,
+        "negative_pct": 0.0,
+        "neutral_pct": 100.0
+      },
+      "intent": {
+        "desire_count": 0,
+        "concern_count": 0,
+        "proposal_count": 0
+      },
+      "keywords": [
+        "ショルイ",
+        "ワタス",
+        "リヨウ",
+        "api",
+        "カイトウ"
+      ],
+      "sample_responses": [
+        "俺は怪盗Xだ　チームみらいからAPI利用料を奪いに来た",
+        "介護を運営していて、現場は、ドタバタの中、国が決めたことで、研修の実施や、ケアプランや事業所など、書類作成やソフト会社へ入力したり、かなり面倒で、ケアマネが、利用者さん宅で、各サービス事業所の担当者会議など、録音して、そこで要約したものを添付したり、こういった技術で、家族の意見が取り込めたり、書式をくにで作ってほしい",
+        "そうなんです。有賀さんに、書類をまとめて、渡したのが、古い書類渡しちゃいました💦"
+      ]
+    },
+    "シル・ツクル・セイジ": {
+      "count": 2,
+      "sentiment": {
+        "positive": 0,
+        "negative": 0,
+        "neutral": 2,
+        "positive_pct": 0.0,
+        "negative_pct": 0.0,
+        "neutral_pct": 100.0
+      },
+      "intent": {
+        "desire_count": 0,
+        "concern_count": 0,
+        "proposal_count": 0
+      },
+      "keywords": [
+        "シル",
+        "ツクル",
+        "セイジ",
+        "イル",
+        "スキーム"
+      ],
+      "sample_responses": [
+        "知らないです",
+        "限界を感じますね。法人を複数作ってしまうスキームを知っている政治家はたくさんの会社を作ってから政治に入ってくると思います。"
+      ]
+    },
+    "ミナオシ・ヒツヨウ・セイド": {
+      "count": 1,
+      "sentiment": {
+        "positive": 1,
+        "negative": 0,
+        "neutral": 0,
+        "positive_pct": 100.0,
+        "negative_pct": 0.0,
+        "neutral_pct": 0.0
+      },
+      "intent": {
+        "desire_count": 1,
+        "concern_count": 0,
+        "proposal_count": 1
+      },
+      "keywords": [
+        "ミナオシ",
+        "ヒツヨウ",
+        "セイド"
+      ],
+      "sample_responses": [
+        "制度も見直しが必要です"
+      ]
+    },
+    "ゴザル": {
+      "count": 2,
+      "sentiment": {
+        "positive": 0,
+        "negative": 0,
+        "neutral": 2,
+        "positive_pct": 0.0,
+        "negative_pct": 0.0,
+        "neutral_pct": 100.0
+      },
+      "intent": {
+        "desire_count": 0,
+        "concern_count": 0,
+        "proposal_count": 0
+      },
+      "keywords": [
+        "ゴザル"
+      ],
+      "sample_responses": [
+        "ありがとうございました！",
+        "こちらこそありがとうございました😊"
+      ]
+    }
+  }
+}
