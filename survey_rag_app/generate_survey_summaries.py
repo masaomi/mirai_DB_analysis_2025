@@ -274,46 +274,143 @@ def generate_summary(llm, topic_name: str, docs: List, stats: Dict) -> str:
 
 
 def convert_markdown_to_html(markdown_text: str) -> str:
-    """Convert markdown to HTML (simple conversion)."""
-    # Simple markdown to HTML conversion
-    html = markdown_text
-    
-    # Headers
-    html = html.replace("# ", "<h1>").replace("\n", "</h1>\n", 1)
-    html = html.replace("## ", "<h2>").replace("\n", "</h2>\n", 1)
-    html = html.replace("### ", "<h3>").replace("\n", "</h3>\n", 1)
-    html = html.replace("#### ", "<h4>").replace("\n", "</h4>\n", 1)
-    
-    # Bold
+    """Convert markdown to HTML (improved conversion)."""
     import re
-    html = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', html)
     
-    # Lists
-    lines = html.split('\n')
+    lines = markdown_text.split('\n')
+    html_lines = []
     in_list = False
-    result_lines = []
+    in_table = False
+    in_paragraph = False
     
-    for line in lines:
-        if line.strip().startswith('- '):
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        stripped = line.strip()
+        
+        # Empty lines
+        if not stripped:
+            if in_paragraph:
+                html_lines.append('</p>')
+                in_paragraph = False
+            if in_list:
+                html_lines.append('</ul>')
+                in_list = False
+            i += 1
+            continue
+        
+        # Headers
+        if stripped.startswith('#### '):
+            if in_paragraph:
+                html_lines.append('</p>')
+                in_paragraph = False
+            if in_list:
+                html_lines.append('</ul>')
+                in_list = False
+            html_lines.append(f'<h4>{stripped[5:]}</h4>')
+        elif stripped.startswith('### '):
+            if in_paragraph:
+                html_lines.append('</p>')
+                in_paragraph = False
+            if in_list:
+                html_lines.append('</ul>')
+                in_list = False
+            html_lines.append(f'<h3>{stripped[4:]}</h3>')
+        elif stripped.startswith('## '):
+            if in_paragraph:
+                html_lines.append('</p>')
+                in_paragraph = False
+            if in_list:
+                html_lines.append('</ul>')
+                in_list = False
+            html_lines.append(f'<h2>{stripped[3:]}</h2>')
+        elif stripped.startswith('# '):
+            if in_paragraph:
+                html_lines.append('</p>')
+                in_paragraph = False
+            if in_list:
+                html_lines.append('</ul>')
+                in_list = False
+            html_lines.append(f'<h2>{stripped[2:]}</h2>')  # Use h2 for main sections
+        
+        # Lists
+        elif stripped.startswith('- ') or stripped.startswith('* '):
+            if in_paragraph:
+                html_lines.append('</p>')
+                in_paragraph = False
             if not in_list:
-                result_lines.append('<ul>')
+                html_lines.append('<ul>')
                 in_list = True
-            result_lines.append(f'<li>{line.strip()[2:]}</li>')
+            # Process bold and italic in list items
+            item_text = stripped[2:]
+            item_text = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', item_text)
+            item_text = re.sub(r'\*(.+?)\*', r'<em>\1</em>', item_text)
+            html_lines.append(f'<li>{item_text}</li>')
+        
+        # Tables
+        elif '|' in stripped and not in_table:
+            if in_paragraph:
+                html_lines.append('</p>')
+                in_paragraph = False
+            if in_list:
+                html_lines.append('</ul>')
+                in_list = False
+            
+            # Start table
+            html_lines.append('<table>')
+            html_lines.append('<thead><tr>')
+            
+            # Header row
+            cells = [cell.strip() for cell in stripped.split('|') if cell.strip()]
+            for cell in cells:
+                cell_text = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', cell)
+                html_lines.append(f'<th>{cell_text}</th>')
+            html_lines.append('</tr></thead>')
+            html_lines.append('<tbody>')
+            
+            # Skip separator line
+            i += 1
+            if i < len(lines) and '|' in lines[i] and '-' in lines[i]:
+                i += 1
+            
+            # Process table rows
+            while i < len(lines) and '|' in lines[i]:
+                row = lines[i].strip()
+                if row:
+                    html_lines.append('<tr>')
+                    cells = [cell.strip() for cell in row.split('|') if cell.strip()]
+                    for cell in cells:
+                        cell_text = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', cell)
+                        html_lines.append(f'<td>{cell_text}</td>')
+                    html_lines.append('</tr>')
+                i += 1
+            
+            html_lines.append('</tbody></table>')
+            continue
+        
+        # Regular paragraphs
         else:
             if in_list:
-                result_lines.append('</ul>')
+                html_lines.append('</ul>')
                 in_list = False
-            result_lines.append(line)
+            if not in_paragraph:
+                html_lines.append('<p>')
+                in_paragraph = True
+            
+            # Process bold and italic
+            text = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', stripped)
+            text = re.sub(r'\*(.+?)\*', r'<em>\1</em>', text)
+            html_lines.append(text)
+        
+        i += 1
     
+    # Close any open tags
+    if in_paragraph:
+        html_lines.append('</p>')
     if in_list:
-        result_lines.append('</ul>')
+        html_lines.append('</ul>')
     
-    html = '\n'.join(result_lines)
-    
-    # Paragraphs
-    html = html.replace('\n\n', '</p><p>')
-    
-    return f'<p>{html}</p>'
+    return '\n'.join(html_lines)
 
 
 def generate_html_report(topic_name: str, topic_slug: str, summary: str, stats: Dict, metadata: Dict) -> str:
@@ -478,6 +575,31 @@ def generate_html_report(topic_name: str, topic_slug: str, summary: str, stats: 
         }}
         .summary li {{
             margin: 10px 0;
+        }}
+        .summary table {{
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }}
+        .summary th, .summary td {{
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }}
+        .summary th {{
+            background-color: #f0f0f0;
+            color: #333;
+            font-weight: bold;
+        }}
+        .summary tr:hover {{
+            background-color: #f9f9f9;
+        }}
+        .summary p {{
+            margin: 15px 0;
+        }}
+        .summary em {{
+            font-style: italic;
+            color: #555;
         }}
         .statistics {{
             background: white;
