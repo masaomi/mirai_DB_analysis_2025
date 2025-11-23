@@ -10,6 +10,7 @@ A Retrieval-Augmented Generation (RAG) system for analyzing and querying survey 
 - **Advanced filtering** by topic, date, quality, sentiment, and keywords
 - **Flexible LLM support** (Ollama local / AWS Bedrock cloud)
 - **Interactive Streamlit interface** with comprehensive statistics
+- **Batch summary generation** - Create HTML reports for all survey topics
 - **Japanese language optimized** for survey response analysis
 
 ## 📊 What's New in Enhanced Version
@@ -78,6 +79,35 @@ streamlit run app.py
 
 The app will open in your browser at `http://localhost:8501`
 
+### Step 3: Generate Survey Summaries (Optional)
+
+Generate comprehensive HTML summaries for each survey topic:
+
+```bash
+./generate_summaries.sh
+```
+
+Or with custom options:
+
+```bash
+# Use AWS Bedrock instead of Ollama
+python generate_survey_summaries.py --provider bedrock
+
+# Process specific topics only
+python generate_survey_summaries.py --topics marumie-shikin-user mirai-gikai-interview
+
+# Custom output directory
+python generate_survey_summaries.py --output-dir ./my_summaries
+```
+
+View the generated summaries:
+
+```bash
+open survey_summaries_html/index.html
+```
+
+See [SUMMARY_GENERATION_GUIDE.md](./SUMMARY_GENERATION_GUIDE.md) for detailed documentation.
+
 ## 🎨 User Interface
 
 ### Main Page
@@ -115,13 +145,22 @@ Ask questions about the survey data:
 
 ```
 survey_rag_app/
-├── ingest_data.py              # Enhanced data ingestion script
-├── app.py                      # Streamlit application
-├── requirements.txt            # Python dependencies
-├── README.md                   # This file
-├── ENHANCED_FEATURES.md        # Detailed feature documentation
-├── chroma_db/                  # Vector database (generated)
-└── ingestion_statistics.json  # Statistics file (generated)
+├── ingest_data.py                   # Enhanced data ingestion script
+├── app.py                           # Streamlit application
+├── generate_survey_summaries.py     # Batch summary generator
+├── requirements.txt                 # Python dependencies
+├── start_app.sh                     # App launcher script
+├── ingest.sh                        # Ingestion helper script
+├── generate_summaries.sh            # Summary generation script
+├── README.md                        # This file
+├── QUICKSTART.md                    # Quick start guide
+├── ENHANCED_FEATURES.md             # Detailed feature documentation
+├── SUMMARY_GENERATION_GUIDE.md      # Summary generation guide
+├── chroma_db/                       # Vector database (generated)
+├── ingestion_statistics.json        # Statistics file (generated)
+└── survey_summaries_html/           # Generated HTML summaries (optional)
+    ├── index.html                   # Index page
+    └── [topic-slug].html            # Individual topic summaries
 ```
 
 ## 🔧 Configuration
