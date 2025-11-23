@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>「みらいまる見え政治資金」ユーザーインタビュー - アンケート要約レポート</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .header h1 {
+            margin: 0 0 10px 0;
+            font-size: 2em;
+        }
+        .metadata {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .metadata p {
+            margin: 5px 0;
+            color: #666;
+        }
+        .summary {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .summary h1 {
+            color: #667eea;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 10px;
+        }
+        .summary h2 {
+            color: #764ba2;
+            margin-top: 30px;
+        }
+        .summary h3 {
+            color: #555;
+        }
+        .summary ul {
+            padding-left: 25px;
+        }
+        .summary li {
+            margin: 10px 0;
+        }
+        .statistics {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .statistics h2 {
+            color: #667eea;
+            margin-top: 0;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .stat-card {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+        .stat-card h3 {
+            margin: 0 0 10px 0;
+            color: #666;
+            font-size: 0.9em;
+            text-transform: uppercase;
+        }
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #667eea;
+            margin: 0;
+        }
+        .stat-label {
+            font-size: 0.85em;
+            color: #999;
+            margin: 5px 0 0 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background-color: #667eea;
+            color: white;
+            font-weight: bold;
+        }
+        tr:hover {
+            background-color: #f5f5f5;
+        }
+        .footer {
+            text-align: center;
+            color: #999;
+            padding: 20px;
+            font-size: 0.9em;
+        }
+        @media print {
+            body {
+                background: white;
+            }
+            .header, .metadata, .summary, .statistics {
+                box-shadow: none;
+            }
+        }
+    
+        .summary table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        .summary th, .summary td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        .summary th {
+            background-color: #f0f0f0;
+            color: #333;
+            font-weight: bold;
+        }
+        .summary tr:hover {
+            background-color: #f9f9f9;
+        }
+        .summary p {
+            margin: 15px 0;
+        }
+        .summary ul {
+            margin: 15px 0;
+        }
+        .summary h2 {
+            margin-top: 30px;
+            margin-bottom: 15px;
+        }
+        .summary h3 {
+            margin-top: 20px;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>「みらいまる見え政治資金」ユーザーインタビュー</h1>
+        <p>アンケート要約レポート</p>
+    </div>
+    
+    <div class="metadata">
+        <p><strong>トピックID:</strong> marumie-shikin-user</p>
+        <p><strong>生成日時:</strong> 2025-11-23 17:01:39</p>
+        <p><strong>LLMプロバイダー:</strong> ollama (gpt-oss:20b)</p>
+        <p><strong>総回答数:</strong> 100件</p>
+    </div>
+    
+    <div class="summary">
+        <h1>📝 要約レポート</h1>
+        
+
+
+<p>要約レポート：政党「チームみらい」政治資金透明性ツールに関するアンケート</p>
+<h2>1. 概要サマリー</h2>
+
+<p>本アンケートは、「チームみらい」が開発した政治資金可視化ツール（サンキー図・リアルタイムデータ連携など）に対する利用者・関係者の感想を集め、今後の改善点や導入戦略を検討することを目的としています。背景としては、従来の年1回の報告書は数字の羅列で一般市民にとって敷居が高く、透明性向上を図るためにクラウド会計ソフトと連携したリアルタイム可視化を試みた点が挙げられます。</p>
+<p>回答は主に肯定的な評価（「見る気になれる」「データが見やすい」）と懸念的な指摘（「データ加工の透明性」「対象期間の不明確」）が混在し、特にUI/UXと情報の深さ・信頼性に関する意見が多く見られました。</p>
+<h2>2. 主要な発見事項</h2>
+
+<p>可視化の効果が高い</p>
+<p>「お金が入ってくるのと出ていくのが、目で見えて、用途もわかるので理解しやすいです」（回答29）</p>
+<p>「政治資金の可視化ができる」（回答30）</p>
+<p>データの期間・範囲が不明確</p>
+<p>「データの期間や範囲が不明確」（回答22）</p>
+<p>「25.9.30時点」と書かれていても、何月分の収支なのかが分からない」（回答22）</p>
+<p>初心者向けガイドが不足</p>
+<p>「表示はしたけど、ガイドはまだつけてない」（回答27）</p>
+<p>「初心者向けのガイドや解説の充実」（回答27）</p>
+<p>リアルタイム化のメリットとリスク</p>
+<p>「従来の年1回の報告書よりもリアルタイムに近い形で、しかもクラウド会計ソフトと連携して自動化」（回答29）</p>
+<p>「識者のスコア付けに依存するアプローチも、結局は「誰がその識者を選ぶの？」という新たな不透明性」（回答29）</p>
+<p>教育・広報への応用</p>
+<p>「小中学生にも触れてほしい」（回答26）</p>
+<p>「過去提出された報告書をdeepLのように翻訳してくれたり、概要を教えてくれる」（回答27）</p>
+<h2>3. 感情分析</h2>
+
+<p>全体的な感情傾向：ポジティブが圧倒的（約70％）で、ツールの「見る気になれる」点や「スマホでの操作性」に対する称賛が多い。</p>
+<p>ポジティブ意見：</p>
+<p>「見る気になれる可視化の価値」（回答30）</p>
+<p>「個人寄付の件数表示やスマホでの操作性」（回答30）</p>
+<p>ネガティブ意見：</p>
+<p>「データを加工されてるので信用しきれない」（回答29）</p>
+<p>「データの期間や範囲が不明確」（回答22）</p>
+<p>「サンキー図だされても、解けない問題解け！って言われてるみたいでストレス」（回答20）</p>
+<h2>4. 主要な意見・テーマ</h2>
+
+<p>テーマ</p>
+<p>代表的な意見グループ</p>
+<p>UI/UXと可視化</p>
+<p>「サンキー図が分かりやすい」「スマホでの操作性が重要」</p>
+<p>データの透明性と信頼性</p>
+<p>「データ加工の透明性」「リアルタイム化のメリット・リスク」</p>
+<p>対象ユーザーとガイド</p>
+<p>「初心者向けガイド不足」「教育現場での活用」</p>
+<p>情報の深さと簡潔さのバランス</p>
+<p>「簡単にしすぎると重要情報が見えなくなる」</p>
+<p>広報・親しみやすさ</p>
+<p>「親しみやすいトーンと権威性のバランス」</p>
+<h2>5. 注目すべき個別意見</h2>
+
+<p>データ期間の不明確さ</p>
+<p>「データの期間や範囲が不明確」（回答22）</p>
+<p>「25.9.30時点」と書かれていても、何月分の収支なのかが分からない」（回答22）</p>
+<p>これはツールの信頼性に直結する重要課題です。</p>
+<p>教育的活用提案</p>
+<p>「小中学生にも触れてほしい」（回答26）</p>
+<p>「過去提出された報告書をdeepLのように翻訳してくれたり、概要を教えてくれる」（回答27）</p>
+<p>教育機関での導入を視野に入れた機能拡張が示唆されています。</p>
+<p>親しみやすさと権威性の両立</p>
+<p>「親しみやすさと権威性・信頼性のバランス」（回答20）</p>
+<p>大政党が同様の手法を採用した際の受容性を懸念しています。</p>
+<h2>6. 結論と示唆</h2>
+
+<p>可視化は有効だが、情報の正確性と期間の明示が必須。データの加工プロセスを公開し、期間・範囲を明確に表示することで信頼性を向上させる。</p>
+<p>初心者向けガイドと教育用機能を追加。スマホ向けUIの改善と、報告書の要約・翻訳機能を実装すれば、幅広い層への浸透が期待できる。</p>
+<p>データのリアルタイム化と識者評価の透明性を確保。クラウド会計連携のログを公開し、識者選定プロセスを明示することで新たな不透明性を排除。</p>
+<p>親しみやすさと権威性のバランスを検討。大政党導入時に受容性を高めるため、トーンと情報の深さを調整したバージョンを用意する。</p>
+<p>以上の洞察を踏まえ、次期アップデートでは「データ期間の明示」「初心者ガイド」「教育用翻訳機能」「識者評価プロセスの透明化」を優先的に検討・実装することを推奨します。</p>
+    
+    
+    
+    </div>
+    
+    
+    <div class="statistics">
+        <h2>📊 統計情報</h2>
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h3>総回答数</h3>
+                <p class="stat-value">100</p>
+            </div>
+            <div class="stat-card">
+                <h3>平均感情スコア</h3>
+                <p class="stat-value">0.000</p>
+                <p class="stat-label">(-1: ネガティブ 〜 +1: ポジティブ)</p>
+            </div>
+            <div class="stat-card">
+                <h3>期間</h3>
+                <p class="stat-value">unknown</p>
+                <p class="stat-label">〜 unknown</p>
+            </div>
+        </div>
+        
+        <h3>感情分布</h3>
+        <table>
+            <tr>
+                <th>感情</th>
+                <th>回答数</th>
+                <th>割合</th>
+            </tr>
+    
+            <tr>
+                <td>unknown</td>
+                <td>100</td>
+                <td>100.0%</td>
+            </tr>
+        
+        </table>
+        
+        <h3>品質分布</h3>
+        <table>
+            <tr>
+                <th>品質</th>
+                <th>回答数</th>
+                <th>割合</th>
+            </tr>
+    
+            <tr>
+                <td>unknown</td>
+                <td>100</td>
+                <td>100.0%</td>
+            </tr>
+        
+        </table>
+        
+        <h3>キーワード統計</h3>
+        <table>
+            <tr>
+                <th>種類</th>
+                <th>該当回答数</th>
+            </tr>
+    
+            <tr>
+                <td>ポジティブキーワード</td>
+                <td>0</td>
+            </tr>
+            <tr>
+                <td>ネガティブキーワード</td>
+                <td>0</td>
+            </tr>
+            <tr>
+                <td>政策関連キーワード</td>
+                <td>0</td>
+            </tr>
+        </table>
+    </div>
+    
+    
+    <div class="footer">
+        <p>Generated by Survey RAG Analysis System</p>
+        <p>2025-11-23 17:01:39</p>
+    </div>
+</body>
+</html>

@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>「みらいまる見え政治資金」開発に関するインタビュー - アンケート要約レポート</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .header h1 {
+            margin: 0 0 10px 0;
+            font-size: 2em;
+        }
+        .metadata {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .metadata p {
+            margin: 5px 0;
+            color: #666;
+        }
+        .summary {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .summary h1 {
+            color: #667eea;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 10px;
+        }
+        .summary h2 {
+            color: #764ba2;
+            margin-top: 30px;
+        }
+        .summary h3 {
+            color: #555;
+        }
+        .summary ul {
+            padding-left: 25px;
+        }
+        .summary li {
+            margin: 10px 0;
+        }
+        .statistics {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .statistics h2 {
+            color: #667eea;
+            margin-top: 0;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .stat-card {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+        .stat-card h3 {
+            margin: 0 0 10px 0;
+            color: #666;
+            font-size: 0.9em;
+            text-transform: uppercase;
+        }
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #667eea;
+            margin: 0;
+        }
+        .stat-label {
+            font-size: 0.85em;
+            color: #999;
+            margin: 5px 0 0 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background-color: #667eea;
+            color: white;
+            font-weight: bold;
+        }
+        tr:hover {
+            background-color: #f5f5f5;
+        }
+        .footer {
+            text-align: center;
+            color: #999;
+            padding: 20px;
+            font-size: 0.9em;
+        }
+        @media print {
+            body {
+                background: white;
+            }
+            .header, .metadata, .summary, .statistics {
+                box-shadow: none;
+            }
+        }
+    
+        .summary table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        .summary th, .summary td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        .summary th {
+            background-color: #f0f0f0;
+            color: #333;
+            font-weight: bold;
+        }
+        .summary tr:hover {
+            background-color: #f9f9f9;
+        }
+        .summary p {
+            margin: 15px 0;
+        }
+        .summary ul {
+            margin: 15px 0;
+        }
+        .summary h2 {
+            margin-top: 30px;
+            margin-bottom: 15px;
+        }
+        .summary h3 {
+            margin-top: 20px;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>「みらいまる見え政治資金」開発に関するインタビュー</h1>
+        <p>アンケート要約レポート</p>
+    </div>
+    
+    <div class="metadata">
+        <p><strong>トピックID:</strong> marumie-shikin</p>
+        <p><strong>生成日時:</strong> 2025-11-23 16:53:44</p>
+        <p><strong>LLMプロバイダー:</strong> ollama (gpt-oss:20b)</p>
+        <p><strong>総回答数:</strong> 42件</p>
+    </div>
+    
+    <div class="summary">
+        <h1>📝 要約レポート</h1>
+        
+
+
+<p>「みらいまる見え政治資金」開発に関するインタビュー調査レポート--</p>
+<h2>1. 概要サマリー</h2>
+
+<p>目的・背景</p>
+<p>本調査は、政治資金の可視化を目指す「みらいまる見え政治資金」プロジェクトに関わるエンジニア・ユーザーを対象に、開発過程・技術選定・ユーザー体験・社会的意義などを把握することを目的としています。</p>
+<p>42件の回答が得られ、回答者は主にプロジェクトに関わる技術者・関係者、またはプロジェクトに興味を持つ一般ユーザーが混在しています。</p>
+<p>全体的な傾向</p>
+<p>感情スコアは平均0.0で、ポジティブ・ネガティブキーワードは検出されませんでした。</p>
+<p>回答は「質問が不明」「回答が不明」「英語でのやり取り」など、質問内容と回答がずれたケースが多く、データの一貫性は低いです。</p>
+<p>それでも、可視化の「見やすさ」や「リアルタイム要約」の利便性に対して肯定的なコメントが散見される一方で、システム外の「裏金」や「法人複数化」などの限界に対する懸念も表れています。</p>
+<p>--</p>
+<h2>2. 主要な発見事項</h2>
+
+<p>発見</p>
+<p>具体的回答例</p>
+<p>1</p>
+<p>可視化の直感的な使いやすさ</p>
+<p>「サイトとしてとても見やすいし、今までにない形で良いと思う」「とても分かりやすくて面白い」</p>
+<p>2</p>
+<p>データ連携の重要性</p>
+<p>「MoneyForwardなどの会計システムと連携する部分があったと思うのですが…」「自動連携の仕組みについて…」</p>
+<p>3</p>
+<p>制度面での支援が必要</p>
+<p>「制度も見直しが必要です」「クレカ使って、専用でやらないと罰則になるくらいの強制力がなければ使わない」</p>
+<p>4</p>
+<p>システム外の資金流れへの懸念</p>
+<p>「限界を感じますね。法人を複数作ってしまうスキームを知っている政治家はたくさんの会社を作ってから政治に入ってくると思います。」</p>
+<p>5</p>
+<p>回答者の混在・誤解</p>
+<p>「Could you please speak in English?」「俺は怪盗Xだ　チームみらいからAPI利用料を奪いに来た」</p>
+<p>--</p>
+<h2>3. 感情分析</h2>
+
+<p>全体傾向：平均感情スコア 0.0 → 中立。</p>
+<p>ポジティブ意見（数例）</p>
+<p>「とても分かりやすくて面白い」</p>
+<p>「サイトとしてとても見やすい」</p>
+<p>ネガティブ意見（数例）</p>
+<p>「限界を感じますね」</p>
+<p>「制度も見直しが必要です」</p>
+<p>その他：多くの回答は質問とずれた内容（英語でのやり取り、質問が不明、回答が不明）であるため、感情の定量化は難しい。</p>
+<p>--</p>
+<h2>4. 主要な意見・テーマ</h2>
+
+<p>テーマ</p>
+<p>代表的な意見グループ</p>
+<p>具体例</p>
+<p>可視化のユーザー体験</p>
+<p>UI/UXに関心が高いユーザー</p>
+<p>「サイトとしてとても見やすい」「とても分かりやすくて面白い」</p>
+<p>データ連携</p>
+<p>技術者・システム統合担当</p>
+<p>「MoneyForwardとの連携」「自動連携の仕組み」</p>
+<p>制度・法規制</p>
+<p>政策担当・社会的関心者</p>
+<p>「制度も見直しが必要」「強制力がなければ使わない」</p>
+<p>限界と課題</p>
+<p>透明性を重視するユーザー</p>
+<p>「限界を感じます」「裏金・法人複数化」</p>
+<p>回答者の混在</p>
+<p>誤解・非対象者</p>
+<p>「Could you please speak in English?」「俺は怪盗Xだ」</p>
+<p>--</p>
+<h2>5. 注目すべき個別意見</h2>
+
+<p>回答番号</p>
+<p>内容</p>
+<p>コメント</p>
+<p>---------</p>
+<p>-----</p>
+<p>---------</p>
+<p>3</p>
+<p>「政治資金がわかれば裏金とかも予防できるのでおかしな利権とかもなくなりそう」</p>
+<p>透明性の直接的な効果を期待する典型例。</p>
+<p>11</p>
+<p>「完全でなくても一歩前進として意味がある」</p>
+<p>完璧を求めず、段階的改善を支持。</p>
+<p>13</p>
+<p>「俺は怪盗Xだ　チームみらいからAPI利用料を奪いに来た」</p>
+<p>非対象者の混入例。</p>
+<p>25</p>
+<p>「限界を感じますね。法人を複数作ってしまうスキームを知っている政治家はたくさんの会社を作ってから政治に入ってくると思います。」</p>
+<p>システム外の資金流れに対する懸念。</p>
+<p>27</p>
+<p>「クレカ使って、専用でやらないと罰則になるくらいの強制力がなければ使わない」</p>
+<p>法規制の必要性を主張。</p>
+<p>--</p>
+<h2>6. 結論と示唆</h2>
+
+<h2>1. ユーザー体験の向上が鍵</h2>
+
+<p>直感的なUIと自動データ連携は高評価。今後は「専門知識不要のシンプル設定」をさらに推進し、導入ハードルを下げることが重要。</p>
+<h2>2. 制度的支援の検討</h2>
+
+<p>参加者の多くが「強制力・制度見直し」を求めている。政府や政党レベルでの導入義務化やインセンティブ設計を検討すべき。</p>
+<h2>3. 限界への対策</h2>
+
+<p>システム外の資金流れ（法人複数化・裏金）を補完するため、外部監査や追加データソース（税務署データ等）の連携を検討。</p>
+<h2>4. データ品質と回答者管理</h2>
+
+<p>今回の回答は質問とずれたものが多く、データの信頼性が低い。次回調査では質問文を明確化し、対象者を限定することで有効なフィードバックを得る。</p>
+<h2>5. 継続的なフィードバックループ</h2>
+
+<p>ユーザーからの実務的な要望（例：介護現場での書類作成支援）を取り入れ、プロダクトの拡張性を高める。</p>
+<p>---> 総括</p>
+<p>> 「みらいまる見え政治資金」プロジェクトは、可視化の直感性とデータ連携の利便性で一定の支持を得ている一方、制度的支援とシステム外資金の可視化という課題が残っています。今後はユーザー体験のさらなる向上と、法規制・インセンティブの整備を両輪にして、透明性向上を実現していくことが求められます。</p>
+    
+    
+    
+    </div>
+    
+    
+    <div class="statistics">
+        <h2>📊 統計情報</h2>
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h3>総回答数</h3>
+                <p class="stat-value">42</p>
+            </div>
+            <div class="stat-card">
+                <h3>平均感情スコア</h3>
+                <p class="stat-value">0.000</p>
+                <p class="stat-label">(-1: ネガティブ 〜 +1: ポジティブ)</p>
+            </div>
+            <div class="stat-card">
+                <h3>期間</h3>
+                <p class="stat-value">unknown</p>
+                <p class="stat-label">〜 unknown</p>
+            </div>
+        </div>
+        
+        <h3>感情分布</h3>
+        <table>
+            <tr>
+                <th>感情</th>
+                <th>回答数</th>
+                <th>割合</th>
+            </tr>
+    
+            <tr>
+                <td>unknown</td>
+                <td>42</td>
+                <td>100.0%</td>
+            </tr>
+        
+        </table>
+        
+        <h3>品質分布</h3>
+        <table>
+            <tr>
+                <th>品質</th>
+                <th>回答数</th>
+                <th>割合</th>
+            </tr>
+    
+            <tr>
+                <td>unknown</td>
+                <td>42</td>
+                <td>100.0%</td>
+            </tr>
+        
+        </table>
+        
+        <h3>キーワード統計</h3>
+        <table>
+            <tr>
+                <th>種類</th>
+                <th>該当回答数</th>
+            </tr>
+    
+            <tr>
+                <td>ポジティブキーワード</td>
+                <td>0</td>
+            </tr>
+            <tr>
+                <td>ネガティブキーワード</td>
+                <td>0</td>
+            </tr>
+            <tr>
+                <td>政策関連キーワード</td>
+                <td>0</td>
+            </tr>
+        </table>
+    </div>
+    
+    
+    <div class="footer">
+        <p>Generated by Survey RAG Analysis System</p>
+        <p>2025-11-23 16:53:44</p>
+    </div>
+</body>
+</html>

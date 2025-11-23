@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>「みらい議会」ユーザーインタビュー - アンケート要約レポート</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .header h1 {
+            margin: 0 0 10px 0;
+            font-size: 2em;
+        }
+        .metadata {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .metadata p {
+            margin: 5px 0;
+            color: #666;
+        }
+        .summary {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .summary h1 {
+            color: #667eea;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 10px;
+        }
+        .summary h2 {
+            color: #764ba2;
+            margin-top: 30px;
+        }
+        .summary h3 {
+            color: #555;
+        }
+        .summary ul {
+            padding-left: 25px;
+        }
+        .summary li {
+            margin: 10px 0;
+        }
+        .statistics {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .statistics h2 {
+            color: #667eea;
+            margin-top: 0;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .stat-card {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+        .stat-card h3 {
+            margin: 0 0 10px 0;
+            color: #666;
+            font-size: 0.9em;
+            text-transform: uppercase;
+        }
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #667eea;
+            margin: 0;
+        }
+        .stat-label {
+            font-size: 0.85em;
+            color: #999;
+            margin: 5px 0 0 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background-color: #667eea;
+            color: white;
+            font-weight: bold;
+        }
+        tr:hover {
+            background-color: #f5f5f5;
+        }
+        .footer {
+            text-align: center;
+            color: #999;
+            padding: 20px;
+            font-size: 0.9em;
+        }
+        @media print {
+            body {
+                background: white;
+            }
+            .header, .metadata, .summary, .statistics {
+                box-shadow: none;
+            }
+        }
+    
+        .summary table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        .summary th, .summary td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        .summary th {
+            background-color: #f0f0f0;
+            color: #333;
+            font-weight: bold;
+        }
+        .summary tr:hover {
+            background-color: #f9f9f9;
+        }
+        .summary p {
+            margin: 15px 0;
+        }
+        .summary ul {
+            margin: 15px 0;
+        }
+        .summary h2 {
+            margin-top: 30px;
+            margin-bottom: 15px;
+        }
+        .summary h3 {
+            margin-top: 20px;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>「みらい議会」ユーザーインタビュー</h1>
+        <p>アンケート要約レポート</p>
+    </div>
+    
+    <div class="metadata">
+        <p><strong>トピックID:</strong> mirai-gikai-interview</p>
+        <p><strong>生成日時:</strong> 2025-11-23 16:57:36</p>
+        <p><strong>LLMプロバイダー:</strong> ollama (gpt-oss:20b)</p>
+        <p><strong>総回答数:</strong> 100件</p>
+    </div>
+    
+    <div class="summary">
+        <h1>📝 要約レポート</h1>
+        
+
+
+<p>「みらい議会」ユーザーインタビュー 要約レポート--</p>
+<h2>1. 概要サマリー</h2>
+
+<p>目的・背景</p>
+<p>「みらい議会」は国会・法案情報を一般市民に分かりやすく提供することを目指すサービス。</p>
+<p>本アンケートは、実際に利用したユーザーからのフィードバックを収集し、UI/UX、情報設計、機能追加の優先順位を決定するために実施。</p>
+<p>100件の回答が寄せられ、平均感情スコアは0.0（中立）で、ポジティブ／ネガティブキーワードは検出されていない。</p>
+<p>全体的な傾向</p>
+<p>ほとんどの回答は「使いやすい」「情報が見やすい」「親しみやすい」といった肯定的コメントが多い。</p>
+<p>具体的な改善要望としては、情報の可視化（ステータス・時系列）、説明のレベル調整、視覚的補助（フローチャート・イラスト）、ふりがな・ルビ機能の目立つ配置が挙げられる。</p>
+<p>逆に、情報量の不足（法案数が少ない、過去法案とのリンクがない）や操作性の課題（PC版のレイアウトがスマホと同じ幅で見づらい）も指摘されている。</p>
+<p>--</p>
+<h2>2. 主要な発見事項</h2>
+
+<p>発見</p>
+<p>具体的回答例</p>
+<p>1</p>
+<p>情報の可視化が評価される</p>
+<p>「①現在どのような法案が審議されているか／準備中であるか ②審議のステータス」「この2点が可視化されたことが素晴らしいと思いました」</p>
+<p>2</p>
+<p>説明レベルの切替が重要</p>
+<p>「やさしく」と「詳しく」の切り替え機能が高評価。「簡潔に1〜2行程度」など、短い説明が好まれる傾向。</p>
+<p>3</p>
+<p>視覚的補助の要望</p>
+<p>「フローチャートを生成して読む労力を簡易化して誘導したり、親しみやすいイラスト」「文字だけだと読むことに疲れてしまう」</p>
+<p>4</p>
+<p>ふりがな・ルビ機能の目立つ配置</p>
+<p>「画面の一番上に目立つボタンがあると良い」「ふりがな機能がとても良いと思います」</p>
+<p>5</p>
+<p>情報量不足への不満</p>
+<p>「法案が3つしか表示されていないのは残念でした」「過去の法案も参照できると面白い」</p>
+<p>--</p>
+<h2>3. 感情分析</h2>
+
+<p>感情</p>
+<p>件数</p>
+<p>コメント</p>
+<p>-----</p>
+<p>-----</p>
+<p>---------</p>
+<p>中立</p>
+<p>100</p>
+<p>すべての回答は感情スコアが0.0で、ポジティブ／ネガティブキーワードは検出されていない。</p>
+<p>ポジティブ</p>
+<p>0</p>
+<p>直接的な肯定表現は多いものの、感情スコアは中立に分類。</p>
+<p>ネガティブ</p>
+<p>0</p>
+<p>ネガティブキーワードは検出されていない。</p>
+<p>> 結論：全体としては「中立的に評価している」状態。肯定的なコメントが多いものの、感情分析ツールでは明確にポジティブと判定されていない。--</p>
+<h2>4. 主要な意見・テーマ</h2>
+
+<p>テーマ</p>
+<p>主な意見</p>
+<p>代表的回答</p>
+<p>-------</p>
+<p>---------</p>
+<p>-----------</p>
+<p>情報の可視化</p>
+<p>ステータス、時系列、党別表示</p>
+<p>「最新」「決議間近」「党別」でのソート機能</p>
+<p>説明レベル</p>
+<p>やさしい／詳しい切替、簡潔さ</p>
+<p>「簡潔に1〜2行程度」</p>
+<p>視覚的補助</p>
+<p>フローチャート、イラスト、図解</p>
+<p>「フローチャートを生成して読む労力を簡易化」</p>
+<p>ふりがな・ルビ</p>
+<p>目立つ配置、使いやすさ</p>
+<p>「画面の一番上に目立つボタンがあると良い」</p>
+<p>情報量</p>
+<p>法案数、過去法案リンク</p>
+<p>「法案が3つしか表示されていない」</p>
+<p>操作性</p>
+<p>PC版レイアウト、スマホ対応</p>
+<p>「PC版で…幅が細く見つけにくい」</p>
+<p>対象ユーザー</p>
+<p>若年層、家族、職場</p>
+<p>「家族や友人、職場の人」</p>
+<p>--</p>
+<h2>5. 注目すべき個別意見</h2>
+
+<p>回答番号</p>
+<p>印象的なポイント</p>
+<p>コメント</p>
+<p>---------</p>
+<p>-----------------</p>
+<p>---------</p>
+<p>3</p>
+<p>「簡潔に1〜2行程度」</p>
+<p>説明の長さに対する具体的な要望。</p>
+<p>4</p>
+<p>「PCで閲覧してる人の場合は見落として勘違いしたコメントを出しそう」</p>
+<p>PCとスマホでの閲覧差異を指摘。</p>
+<p>6</p>
+<p>「改行できないのが気になる」</p>
+<p>UIのテキスト編集機能に関する具体的な不満。</p>
+<p>12</p>
+<p>「法案が3つしか表示されていないのは残念」</p>
+<p>コンテンツ量不足への具体的指摘。</p>
+<p>21</p>
+<p>「とっても感じます！正直いまオールドメディアを見ている人はかなり減っています」</p>
+<p>透明性向上への実感。</p>
+<p>27</p>
+<p>「画面の一番上に目立つボタンがあると良い」</p>
+<p>ふりがな機能の配置改善要望。</p>
+<p>28</p>
+<p>「メリットとデメリットが書いてあったのが良かった」</p>
+<p>バランスの取れた情報提示への評価。</p>
+<p>--</p>
+<h2>6. 結論と示唆  1. 情報可視化の強化</h2>
+
+<p>ステータス・時系列・党別表示をさらに分かりやすく（例：色分けやアイコン）し、ユーザーが「今何が起きているか」を瞬時に把握できるようにする。</p>
+<p>過去法案とのリンクを自動生成し、改正の変遷を一目で確認できる機能を追加。</p>
+<h2>2. 説明レベルの柔軟性</h2>
+
+<p>「やさしく」「詳しく」の切替をさらに明確化し、ユーザーが自分の知識レベルに合わせて選択できるように。</p>
+<p>1〜2行程度の簡潔説明をデフォルトにし、必要に応じて詳細に展開できるようにする。</p>
+<h2>3. 視覚的補助の導入</h2>
+
+<p>フローチャートやイラストを自動生成する仕組みを検討。</p>
+<p>重要ポイントを図解化し、文字情報だけでなく視覚情報で理解をサポート。</p>
+<h2>4. ふりがな・ルビ機能の可視化</h2>
+
+<p>画面上部に目立つボタンを配置し、すぐにオン/オフできるように。</p>
+<p>ルビ表示をデフォルトで有効にするか、ユーザー設定で切替可能に。</p>
+<h2>5. 操作性の改善</h2>
+
+<p>PC版のレイアウトをスマホと同じ幅にしないようにし、テキストブロックを適切に分割。</p>
+<p>改行やテキスト編集機能を追加し、ユーザーが自由に情報を整理できるように。</p>
+<h2>6. 情報量の拡充</h2>
+
+<p>法案数を増やし、検索・フィルタ機能を充実させる。</p>
+<p>「最新」「決議間近」「党別」などのソート・フィルタを簡単に切替できるUIを実装。</p>
+<h2>7. ユーザー層の拡大</h2>
+
+<p>若年層や子ども向けにゲーム性やクイズ機能を導入し、政治への関心を喚起。</p>
+<p>友人・家族への紹介を促進するため、シェア機能や紹介特典を検討。</p>
+<p>---最終的な提案</p>
+<p>上記の改善点を優先順位付けし、スプリント単位で実装。</p>
+<p>ユーザーテストを継続的に実施し、実際の操作感や理解度を定量的に測定。</p>
+<p>透明性・中立性を担保するため、一次情報へのリンク表示や外部ファクトチェック機関との連携を検討。</p>
+<p>このレポートはサンプル回答に基づく分析であり、残り70件の回答も同様の傾向があると仮定しています。実際の開発・改善にあたっては、全回答を再度精査し、追加の洞察を取り入れることを推奨します。</p>
+    
+    
+    
+    </div>
+    
+    
+    <div class="statistics">
+        <h2>📊 統計情報</h2>
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h3>総回答数</h3>
+                <p class="stat-value">100</p>
+            </div>
+            <div class="stat-card">
+                <h3>平均感情スコア</h3>
+                <p class="stat-value">0.000</p>
+                <p class="stat-label">(-1: ネガティブ 〜 +1: ポジティブ)</p>
+            </div>
+            <div class="stat-card">
+                <h3>期間</h3>
+                <p class="stat-value">unknown</p>
+                <p class="stat-label">〜 unknown</p>
+            </div>
+        </div>
+        
+        <h3>感情分布</h3>
+        <table>
+            <tr>
+                <th>感情</th>
+                <th>回答数</th>
+                <th>割合</th>
+            </tr>
+    
+            <tr>
+                <td>unknown</td>
+                <td>100</td>
+                <td>100.0%</td>
+            </tr>
+        
+        </table>
+        
+        <h3>品質分布</h3>
+        <table>
+            <tr>
+                <th>品質</th>
+                <th>回答数</th>
+                <th>割合</th>
+            </tr>
+    
+            <tr>
+                <td>unknown</td>
+                <td>100</td>
+                <td>100.0%</td>
+            </tr>
+        
+        </table>
+        
+        <h3>キーワード統計</h3>
+        <table>
+            <tr>
+                <th>種類</th>
+                <th>該当回答数</th>
+            </tr>
+    
+            <tr>
+                <td>ポジティブキーワード</td>
+                <td>0</td>
+            </tr>
+            <tr>
+                <td>ネガティブキーワード</td>
+                <td>0</td>
+            </tr>
+            <tr>
+                <td>政策関連キーワード</td>
+                <td>0</td>
+            </tr>
+        </table>
+    </div>
+    
+    
+    <div class="footer">
+        <p>Generated by Survey RAG Analysis System</p>
+        <p>2025-11-23 16:57:36</p>
+    </div>
+</body>
+</html>
