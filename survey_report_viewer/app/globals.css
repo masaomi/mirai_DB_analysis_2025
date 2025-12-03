@@ -1,0 +1,104 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --foreground-rgb: 15, 23, 42;
+  --background-start-rgb: 248, 250, 252;
+  --background-end-rgb: 241, 245, 249;
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background: linear-gradient(
+      to bottom,
+      rgb(var(--background-start-rgb)),
+      rgb(var(--background-end-rgb))
+    );
+  min-height: 100vh;
+}
+
+/* Markdown Styles */
+.prose h1 {
+  @apply text-3xl font-bold text-slate-800 border-b-4 border-primary-500 pb-2 mb-6;
+}
+
+.prose h2 {
+  @apply text-2xl font-bold text-slate-700 border-l-4 border-primary-500 pl-4 mt-8 mb-4;
+}
+
+.prose h3 {
+  @apply text-xl font-semibold text-slate-600 mt-6 mb-3;
+}
+
+.prose p {
+  @apply text-slate-700 leading-relaxed mb-4;
+}
+
+.prose ul {
+  @apply list-disc list-inside mb-4 space-y-2;
+}
+
+.prose ol {
+  @apply list-decimal list-inside mb-4 space-y-2;
+}
+
+.prose li {
+  @apply text-slate-700;
+}
+
+.prose blockquote {
+  @apply border-l-4 border-primary-400 bg-primary-50 px-4 py-2 italic my-4;
+}
+
+.prose table {
+  @apply w-full border-collapse my-4;
+}
+
+.prose th {
+  @apply bg-primary-600 text-white px-4 py-2 text-left;
+}
+
+.prose td {
+  @apply border border-slate-200 px-4 py-2;
+}
+
+.prose tr:nth-child(even) {
+  @apply bg-slate-50;
+}
+
+.prose hr {
+  @apply border-t border-slate-200 my-8;
+}
+
+/* Chat Styles */
+.chat-message {
+  @apply rounded-xl px-4 py-3 max-w-[80%];
+}
+
+.chat-message.user {
+  @apply bg-primary-500 text-white ml-auto;
+}
+
+.chat-message.assistant {
+  @apply bg-white border border-slate-200 shadow-sm;
+}
+
+/* Animation */
+@keyframes pulse-dot {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 1; }
+}
+
+.loading-dot {
+  animation: pulse-dot 1.4s infinite ease-in-out;
+}
+
+.loading-dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.loading-dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+

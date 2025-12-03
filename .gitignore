@@ -18,3 +18,9 @@ survey_analysis/**/*.pyc
 survey_analysis/enhanced_results/
 survey_analysis/survey_chunks/
 survey_analysis/survey_summaries/
+
+# Survey Report Viewer
+survey_report_viewer/.env
+survey_report_viewer/.env.*
+survey_report_viewer/node_modules/
+survey_report_viewer/.next/
