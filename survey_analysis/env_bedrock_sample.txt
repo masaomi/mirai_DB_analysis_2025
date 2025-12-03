@@ -1,0 +1,164 @@
+# ============================================================================
+# Amazon Bedrock Configuration for Survey Analysis
+# ============================================================================
+# 
+# このファイルを .env という名前でコピーしてください:
+#   cp env_bedrock_sample.txt .env
+#
+# その後、AWS認証情報を設定してください。
+# ============================================================================
+
+# ----------------------------------------------------------------------------
+# AWS Region (Required)
+# ----------------------------------------------------------------------------
+# Bedrock利用可能なリージョンを指定
+# 例: us-east-1, us-west-2, eu-central-1, ap-northeast-1
+AWS_REGION=eu-central-1
+
+# ----------------------------------------------------------------------------
+# Authentication Method 1: Bearer Token (Recommended for Sonnet 4.5)
+# ----------------------------------------------------------------------------
+# Claude Sonnet 4.5のInference Profileを使用する場合はBearer Tokenが必要
+#
+# Bearer Tokenの取得方法:
+#   1. AWSサポートまたはIAMから取得
+#   2. 組織の管理者に問い合わせ
+#
+AWS_BEARER_TOKEN_BEDROCK=
+
+# 設定例（実際のトークンに置き換えてください）:
+# AWS_BEARER_TOKEN_BEDROCK=eyJhbGc...（長いトークン文字列）
+
+# ----------------------------------------------------------------------------
+# Authentication Method 2: AWS Access Keys (Traditional)
+# ----------------------------------------------------------------------------
+# Bearer Tokenを使用しない場合、Access KeyとSecret Keyを使用
+# 
+# Access Keyの取得方法:
+#   1. AWS Console > IAM > Users にアクセス
+#   2. ユーザーを作成または選択
+#   3. Bedrock実行権限を付与（AmazonBedrockFullAccessポリシー）
+#   4. Security credentials > Create access key
+#   5. Access KeyとSecret Keyをコピー
+#
+AWS_ACCESS_KEY_ID=
+AWS_SECRET_ACCESS_KEY=
+
+# 設定例（実際のキーに置き換えてください）:
+# AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE
+# AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+
+# ----------------------------------------------------------------------------
+# Bedrock Model ID (Optional)
+# ----------------------------------------------------------------------------
+# 使用するモデルIDを指定（コマンドライン引数で上書き可能）
+#
+# Available models:
+#
+# Claude Sonnet 4.5 (Inference Profile - Bearer Tokenが必要):
+#   - eu.anthropic.claude-sonnet-4-5-20250929-v1:0 (EU region, デフォルト)
+#   - us.anthropic.claude-sonnet-4-5-20250929-v1:0 (US region)
+#
+# Claude 3.5 Sonnet (Direct model - Access Key認証で使用可能):
+#   - anthropic.claude-3-5-sonnet-20241022-v2:0 (推奨)
+#
+# その他のClaude models:
+#   - anthropic.claude-3-sonnet-20240229-v1:0
+#   - anthropic.claude-3-haiku-20240307-v1:0
+#
+# BEDROCK_MODEL_ID=eu.anthropic.claude-sonnet-4-5-20250929-v1:0
+
+# ----------------------------------------------------------------------------
+# Google API (このスクリプトでは使用しません)
+# ----------------------------------------------------------------------------
+# Geminiを使用する場合は、summarize_surveys_gemini3.pyを使用してください
+# GOOGLE_API_KEY=
+
+# ----------------------------------------------------------------------------
+# Anthropic API (このスクリプトでは使用しません)
+# ----------------------------------------------------------------------------
+# 直接Claude APIを使用する場合は、summarize_surveys.pyを使用してください
+# ANTHROPIC_API_KEY=
+
+# ----------------------------------------------------------------------------
+# Setup Instructions
+# ----------------------------------------------------------------------------
+#
+# Option A: Bearer Token認証（Sonnet 4.5を使用する場合）
+# --------------------------------------------------------
+# 1. AWSコンソールでBedrockのモデルアクセスを有効化:
+#    - AWS Console > Bedrock > Model access
+#    - Inference profiles (Sonnet 4.5)へのアクセスをリクエスト
+#    - 承認を待つ
+#
+# 2. Bearer Tokenを取得（組織の管理者またはAWSサポート経由）
+#
+# 3. このファイルを.envにコピー:
+#    cp env_bedrock_sample.txt .env
+#
+# 4. 以下の値を更新:
+#    - AWS_REGION (例: eu-central-1)
+#    - AWS_BEARER_TOKEN_BEDROCK (取得したトークン)
+#
+# 5. スクリプトを実行:
+#    python summarize_surveys_bedrock.py
+#
+#
+# Option B: Access Key認証（Claude 3.5 Sonnetなどを使用する場合）
+# ------------------------------------------------------------------
+# 1. AWS IAMでユーザーを作成:
+#    - AmazonBedrockFullAccessポリシーをアタッチ
+#    - Access KeyとSecret Keyを生成
+#
+# 2. AWSコンソールでBedrockのモデルアクセスを有効化:
+#    - AWS Console > Bedrock > Model access
+#    - 使用するモデル（例: Claude 3.5 Sonnet）へのアクセスをリクエスト
+#    - 承認を待つ（通常は即座に承認）
+#
+# 3. このファイルを.envにコピー:
+#    cp env_bedrock_sample.txt .env
+#
+# 4. 以下の値を更新:
+#    - AWS_REGION (例: us-east-1)
+#    - AWS_ACCESS_KEY_ID (IAMのAccess Key)
+#    - AWS_SECRET_ACCESS_KEY (IAMのSecret Key)
+#
+# 5. スクリプトを実行（Sonnet 3.5を指定）:
+#    python summarize_surveys_bedrock.py --model sonnet-3.5
+#
+# ----------------------------------------------------------------------------
+# Troubleshooting
+# ----------------------------------------------------------------------------
+#
+# 認証エラーが発生した場合:
+# - AWS認証情報（Bearer TokenまたはAccess Keys）が正しいか確認
+# - IAMユーザー/トークンにbedrock:InvokeModel権限があるか確認
+# - Bedrock Model accessでモデルが有効化されているか確認
+# - Model IDが正確か確認（大文字小文字を含む）
+# - Bedrockが選択したリージョンで利用可能か確認
+# - Sonnet 4.5の場合: Inference Profile IDを使用しているか確認
+# - Sonnet 4.5の場合: Bearer Token認証を使用しているか確認
+#
+# 接続テスト:
+#   python test_bedrock_connection.py
+#
+# ----------------------------------------------------------------------------
+# Notes
+# ----------------------------------------------------------------------------
+#
+# 1. .envファイルはGitにコミットされません（.gitignoreに含まれています）
+# 2. AWS認証情報は秘密情報です。他人と共有しないでください
+# 3. Bedrockはトークン使用量に応じて課金されます
+# 4. Sonnet 4.5はInference Profileとしてのみ利用可能です
+# 5. リージョンによって利用可能なモデルが異なります
+#
+# ----------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
