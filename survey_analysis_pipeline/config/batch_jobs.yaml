@@ -1,0 +1,42 @@
+# Batch processing configuration for Survey Analysis Pipeline
+# 
+# Usage: python main.py batch batch_jobs.yaml
+#
+# Each job can override default settings
+
+jobs:
+  # Basic analysis for all surveys
+  - survey_slug: ai-plan-test
+    output_dir: outputs/ai-plan-test
+    multi_llm: false
+    persona: false
+  
+  - survey_slug: teisuu
+    output_dir: outputs/teisuu
+    multi_llm: false
+    persona: false
+  
+  - survey_slug: bill-of-lading
+    output_dir: outputs/bill-of-lading
+    multi_llm: false
+    persona: false
+
+# Example: Multi-LLM analysis
+# - survey_slug: ai-plan-test
+#   output_dir: outputs/ai-plan-test-multi-llm
+#   multi_llm: true
+#   persona: false
+
+# Example: Persona analysis
+# - survey_slug: ai-plan-test
+#   output_dir: outputs/ai-plan-test-persona
+#   multi_llm: false
+#   persona: true
+
+# Example: Full analysis with all options
+# - survey_slug: ai-plan-test
+#   output_dir: outputs/ai-plan-test-full
+#   multi_llm: true
+#   persona: true
+#   provider: bedrock
+

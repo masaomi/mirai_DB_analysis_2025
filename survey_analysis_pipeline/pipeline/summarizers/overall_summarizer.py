@@ -1,0 +1,224 @@
+"""Generate overall summary from cluster summaries."""
+
+import asyncio
+from dataclasses import dataclass, field
+from typing import List, Dict, Any, Optional
+
+from config.settings import Settings, get_settings
+from core.llm_client import LLMClient
+from pipeline.analyzers.stance_detector import StanceResult
+from pipeline.analyzers.minority_detector import MinorityOpinion
+from .cluster_summarizer import ClusterSummary
+
+
+OVERALL_SUMMARY_PROMPT = """あなたは政策立案者向けにアンケート結果を要約する専門家です。
+以下のアンケート分析結果から、エグゼクティブサマリーと詳細な分析レポートを作成してください。
+
+## アンケート情報
+- タイトル: {survey_title}
+- 総回答数: {total_responses}
+- 実施期間: {date_range}
+
+## 立場分布
+{stance_distribution}
+
+## クラスタ別要約
+{cluster_summaries}
+
+## 注目すべきマイノリティ意見
+{minority_opinions}
+
+## 指示
+以下の形式で包括的な分析を作成してください：
+
+1. **エグゼクティブサマリー**: 意思決定者向けの簡潔な要約（200字以内）
+2. **主要な発見事項**: 重要な発見を5つ以内で
+3. **合意点**: 回答者間で共通している意見
+4. **対立点**: 意見が分かれている論点
+5. **推奨アクション**: 分析結果に基づく推奨事項
+6. **注意点**: 解釈時に注意すべき点
+
+JSON形式で出力してください：
+{{
+    "executive_summary": "エグゼクティブサマリー",
+    "key_findings": ["発見1", "発見2", ...],
+    "consensus_points": ["合意点1", "合意点2", ...],
+    "disagreement_points": ["対立点1", "対立点2", ...],
+    "recommended_actions": ["推奨1", "推奨2", ...],
+    "caveats": ["注意点1", "注意点2", ...]
+}}
+"""
+
+
+@dataclass
+class OverallSummary:
+    """Overall summary of survey analysis."""
+    survey_title: str
+    total_responses: int
+    date_range: tuple[str, str]
+    
+    # Summary content
+    executive_summary: str
+    key_findings: List[str]
+    consensus_points: List[str]
+    disagreement_points: List[str]
+    recommended_actions: List[str]
+    caveats: List[str]
+    
+    # Components
+    stance_distribution: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+    cluster_summaries: List[ClusterSummary] = field(default_factory=list)
+    minority_opinions: List[MinorityOpinion] = field(default_factory=list)
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary."""
+        return {
+            "survey_title": self.survey_title,
+            "total_responses": self.total_responses,
+            "date_range": self.date_range,
+            "executive_summary": self.executive_summary,
+            "key_findings": self.key_findings,
+            "consensus_points": self.consensus_points,
+            "disagreement_points": self.disagreement_points,
+            "recommended_actions": self.recommended_actions,
+            "caveats": self.caveats,
+            "stance_distribution": self.stance_distribution,
+            "cluster_summaries": [cs.to_dict() for cs in self.cluster_summaries],
+            "minority_opinions": [mo.to_dict() for mo in self.minority_opinions],
+        }
+
+
+class OverallSummarizer:
+    """Generate overall summary from all analysis components."""
+    
+    def __init__(
+        self,
+        settings: Optional[Settings] = None,
+        llm_client: Optional[LLMClient] = None,
+    ):
+        """Initialize overall summarizer.
+        
+        Args:
+            settings: Application settings
+            llm_client: LLM client
+        """
+        self.settings = settings or get_settings()
+        self.llm_client = llm_client or LLMClient(self.settings)
+    
+    async def generate_summary(
+        self,
+        survey_title: str,
+        total_responses: int,
+        date_range: tuple[str, str],
+        stance_distribution: Dict[str, Dict[str, Any]],
+        cluster_summaries: List[ClusterSummary],
+        minority_opinions: List[MinorityOpinion],
+    ) -> OverallSummary:
+        """Generate overall summary from analysis components.
+        
+        Args:
+            survey_title: Survey title
+            total_responses: Total number of responses
+            date_range: Date range tuple
+            stance_distribution: Stance distribution data
+            cluster_summaries: List of cluster summaries
+            minority_opinions: List of minority opinions
+            
+        Returns:
+            OverallSummary object
+        """
+        # Format stance distribution
+        stance_text = "\n".join(
+            f"- {stance}: {data['count']}件 ({data['percentage']:.1f}%)"
+            for stance, data in stance_distribution.items()
+        )
+        
+        # Format cluster summaries
+        clusters_text = "\n\n".join(
+            f"### {cs.cluster_label} ({cs.response_count}件)\n"
+            f"**主張**: {cs.group_assertion}\n"
+            f"**論点**: {', '.join(cs.main_points)}\n"
+            f"**感情傾向**: {cs.overall_sentiment}\n"
+            f"**特徴**: {', '.join(cs.distinguishing_features)}"
+            for cs in cluster_summaries
+        )
+        
+        # Format minority opinions
+        minorities_text = "\n".join(
+            f"- (スコア: {mo.outlier_score:.2f}) {mo.content[:200]}..."
+            for mo in minority_opinions[:5]
+        ) if minority_opinions else "特になし"
+        
+        # Build prompt
+        prompt = OVERALL_SUMMARY_PROMPT.format(
+            survey_title=survey_title,
+            total_responses=total_responses,
+            date_range=f"{date_range[0]} ～ {date_range[1]}",
+            stance_distribution=stance_text,
+            cluster_summaries=clusters_text,
+            minority_opinions=minorities_text,
+        )
+        
+        # Call LLM
+        response = await self.llm_client.generate(prompt)
+        
+        # Parse response
+        try:
+            import json
+            json_start = response.find('{')
+            json_end = response.rfind('}') + 1
+            if json_start >= 0 and json_end > json_start:
+                data = json.loads(response[json_start:json_end])
+            else:
+                raise ValueError("No JSON found")
+            
+            return OverallSummary(
+                survey_title=survey_title,
+                total_responses=total_responses,
+                date_range=date_range,
+                executive_summary=data.get("executive_summary", ""),
+                key_findings=data.get("key_findings", []),
+                consensus_points=data.get("consensus_points", []),
+                disagreement_points=data.get("disagreement_points", []),
+                recommended_actions=data.get("recommended_actions", []),
+                caveats=data.get("caveats", []),
+                stance_distribution=stance_distribution,
+                cluster_summaries=cluster_summaries,
+                minority_opinions=minority_opinions,
+            )
+        except Exception:
+            # Fallback
+            return OverallSummary(
+                survey_title=survey_title,
+                total_responses=total_responses,
+                date_range=date_range,
+                executive_summary=response[:500],
+                key_findings=[],
+                consensus_points=[],
+                disagreement_points=[],
+                recommended_actions=[],
+                caveats=["要約の解析に失敗しました。LLMの生出力を確認してください。"],
+                stance_distribution=stance_distribution,
+                cluster_summaries=cluster_summaries,
+                minority_opinions=minority_opinions,
+            )
+    
+    def generate_summary_sync(
+        self,
+        survey_title: str,
+        total_responses: int,
+        date_range: tuple[str, str],
+        stance_distribution: Dict[str, Dict[str, Any]],
+        cluster_summaries: List[ClusterSummary],
+        minority_opinions: List[MinorityOpinion],
+    ) -> OverallSummary:
+        """Synchronous wrapper for generate_summary."""
+        return asyncio.run(self.generate_summary(
+            survey_title=survey_title,
+            total_responses=total_responses,
+            date_range=date_range,
+            stance_distribution=stance_distribution,
+            cluster_summaries=cluster_summaries,
+            minority_opinions=minority_opinions,
+        ))
+

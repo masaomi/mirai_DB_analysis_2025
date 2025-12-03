@@ -1,1 +1,11 @@
 survey_rag_app/chroma_db/
+.DS_Store
+bak
+
+# Survey Analysis Pipeline
+survey_analysis_pipeline/.env
+survey_analysis_pipeline/.env.*
+survey_analysis_pipeline/.cache/
+survey_analysis_pipeline/**/__pycache__/
+survey_analysis_pipeline/**/*.pyc
+survey_analysis_pipeline/outputs/
