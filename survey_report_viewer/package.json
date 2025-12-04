@@ -9,26 +9,26 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@ai-sdk/amazon-bedrock": "^1.0.7",
+    "@ai-sdk/openai": "^0.0.66",
+    "ai": "^3.4.33",
+    "chromadb": "^1.8.1",
+    "chromadb-default-embed": "^2.13.2",
+    "lucide-react": "^0.462.0",
     "next": "15.0.3",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-markdown": "^9.0.1",
-    "remark-gfm": "^4.0.0",
-    "ai": "^3.4.0",
-    "@ai-sdk/openai": "^0.0.66",
-    "chromadb": "^1.8.1",
-    "chromadb-default-embed": "^2.13.2",
-    "lucide-react": "^0.462.0",
-    "recharts": "^2.14.1"
+    "recharts": "^2.14.1",
+    "remark-gfm": "^4.0.0"
   },
   "devDependencies": {
     "@types/node": "^22.9.0",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
-    "typescript": "^5.6.3",
-    "tailwindcss": "^3.4.14",
+    "autoprefixer": "^10.4.20",
     "postcss": "^8.4.47",
-    "autoprefixer": "^10.4.20"
+    "tailwindcss": "^3.4.14",
+    "typescript": "^5.6.3"
   }
 }
-
