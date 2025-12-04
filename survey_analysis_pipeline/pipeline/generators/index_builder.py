@@ -213,14 +213,23 @@ class IndexBuilder:
 特徴: {', '.join(cluster.get('distinguishing_features', []))}
 """.strip()
             
+            # Convert numpy types to Python native types for ChromaDB compatibility
+            cluster_id = cluster.get('cluster_id', i)
+            if hasattr(cluster_id, 'item'):  # numpy type
+                cluster_id = cluster_id.item()
+            
+            response_count = cluster.get('response_count', 0)
+            if hasattr(response_count, 'item'):  # numpy type
+                response_count = response_count.item()
+            
             collection.add(
                 ids=[f"cluster_{i}"],
                 documents=[document],
                 metadatas=[{
                     "type": "cluster_summary",
-                    "cluster_id": cluster.get('cluster_id', i),
-                    "cluster_label": cluster.get('cluster_label', ''),
-                    "response_count": cluster.get('response_count', 0),
+                    "cluster_id": int(cluster_id),
+                    "cluster_label": str(cluster.get('cluster_label', '')),
+                    "response_count": int(response_count),
                 }],
             )
     

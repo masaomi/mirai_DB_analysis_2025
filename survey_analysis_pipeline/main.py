@@ -226,20 +226,43 @@ async def _run_pipeline(
             if multi_llm:
                 task = progress.add_task("[cyan]Running multi-LLM consensus...", total=None)
                 orchestrator = MultiLLMOrchestrator(settings)
-                # Run consensus on executive summary
-                consensus_prompt = f"""
-以下のアンケート分析結果について、総合的な評価と推奨事項を提供してください：
+                
+                # i-1 Grand Prix: Extract bill-focused insights with multi-LLM
+                consensus_prompt = f"""あなたは法案検討を支援する分析の専門家です。
+以下のインタビュー分析結果から、法案を検討する際に参考になる知見を抽出してください。
 
-タイトル: {extraction_result.survey_title}
-回答数: {extraction_result.response_count}
+## インタビュー情報
+- テーマ: {extraction_result.survey_title}
+- 総回答数: {extraction_result.response_count}
 
-立場分布:
-{chr(10).join(f"- {k}: {v['count']}件" for k, v in stance_distribution.items())}
+## 立場分布
+{chr(10).join(f"- {k}: {v['count']}件 ({v['percentage']:.1f}%)" for k, v in stance_distribution.items())}
 
-主要クラスタ:
-{chr(10).join(f"- {cs.cluster_label}: {cs.group_assertion}" for cs in cluster_summaries[:3])}
+## 主要クラスタと意見傾向
+{chr(10).join(f'''
+### {cs.cluster_label} ({cs.response_count}件)
+- 主張: {cs.group_assertion}
+- 論点: {", ".join(cs.main_points[:3])}
+- 感情傾向: {cs.overall_sentiment}
+''' for cs in cluster_summaries[:5])}
+
+## マイノリティ意見（重要な独自視点）
+{chr(10).join(f"- (スコア: {mo.outlier_score:.2f}) {mo.content[:150]}..." for mo in minorities[:5])}
+
+## 指示
+以下の観点で分析し、法案検討に役立つ知見を抽出してください：
+
+1. **法案をサポートする知見**: 法案の意義を裏付ける実務課題やメリット
+2. **法案への懸念点**: リスク、不都合、運用コスト問題など
+3. **専門家・当事者からの具体的指摘**: 深い経験に基づく重要な意見
+4. **総合的な推奨事項**: 法案検討者へのアドバイス
+
+分析結果を日本語で詳しく説明してください。
 """
-                multi_llm_result = await orchestrator.reach_consensus(consensus_prompt)
+                multi_llm_result = await orchestrator.reach_consensus(
+                    consensus_prompt,
+                    system_prompt="あなたは法案分析の専門家です。多角的な視点から法案の影響を分析し、建設的な提言を行ってください。"
+                )
                 progress.update(task, completed=True)
                 console.print(f"  ✓ Multi-LLM agreement score: {multi_llm_result.agreement_score:.2f}")
             
@@ -281,6 +304,7 @@ async def _run_pipeline(
             report_data = ReportData(
                 overall_summary=overall_summary,
                 persona_analysis=persona_result.to_dict() if persona_result else None,
+                multi_llm_consensus=multi_llm_result.to_dict() if multi_llm_result else None,
             )
             
             outputs = report_generator.save_report(

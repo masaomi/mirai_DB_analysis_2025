@@ -54,6 +54,11 @@ class ClusterSummary:
     distinguishing_features: List[str]
     keywords: List[str]
     chunk_summaries: List[ChunkSummary]
+    representative_session_ids: List[str] = None  # Session IDs for reference URLs
+    
+    def __post_init__(self):
+        if self.representative_session_ids is None:
+            self.representative_session_ids = []
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary."""
@@ -67,6 +72,7 @@ class ClusterSummary:
             "overall_sentiment": self.overall_sentiment,
             "distinguishing_features": self.distinguishing_features,
             "keywords": self.keywords,
+            "representative_session_ids": self.representative_session_ids,
         }
 
 
@@ -104,6 +110,18 @@ class ClusterSummarizer:
         Returns:
             ClusterSummary object
         """
+        # Extract representative session IDs from cluster responses
+        representative_session_ids = []
+        if cluster.responses:
+            # Get unique session IDs (up to 5 representatives)
+            seen_ids = set()
+            for resp in cluster.responses[:10]:
+                if hasattr(resp, 'session_id') and resp.session_id not in seen_ids:
+                    representative_session_ids.append(resp.session_id)
+                    seen_ids.add(resp.session_id)
+                if len(representative_session_ids) >= 5:
+                    break
+        
         # Step 1-2: Summarize chunks
         chunk_summaries = await self.chunk_summarizer.summarize_all_chunks(
             cluster.responses
@@ -124,6 +142,7 @@ class ClusterSummarizer:
                 distinguishing_features=cs.unique_perspectives,
                 keywords=cluster.keywords,
                 chunk_summaries=chunk_summaries,
+                representative_session_ids=representative_session_ids,
             )
         
         # Format chunk summaries for merge prompt
@@ -167,6 +186,7 @@ class ClusterSummarizer:
                 distinguishing_features=data.get("distinguishing_features", []),
                 keywords=cluster.keywords,
                 chunk_summaries=chunk_summaries,
+                representative_session_ids=representative_session_ids,
             )
         except Exception:
             # Fallback
@@ -186,6 +206,7 @@ class ClusterSummarizer:
                 distinguishing_features=[],
                 keywords=cluster.keywords,
                 chunk_summaries=chunk_summaries,
+                representative_session_ids=representative_session_ids,
             )
     
     async def summarize_all_clusters(

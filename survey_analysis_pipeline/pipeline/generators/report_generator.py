@@ -25,6 +25,51 @@ REPORT_TEMPLATE = """# {{ survey_title }} - 分析レポート
 
 ---
 
+{% if supporting_insights %}
+## ✅ 法案をサポートする知見
+
+法案の内容を根拠に基づいてサポートする意見です。
+
+{% for insight in supporting_insights %}
+### {{ loop.index }}. {{ insight.content }}
+
+**根拠・背景**: {{ insight.reason }}
+
+{% endfor %}
+{% endif %}
+
+---
+
+{% if concerns %}
+## ⚠️ 法案への懸念点
+
+法案の内容に関する懸念事項です。
+
+{% for concern in concerns %}
+### {{ loop.index }}. {{ concern.content }}
+
+**想定されるリスク**: {{ concern.risk }}
+
+{% endfor %}
+{% endif %}
+
+---
+
+{% if expert_insights %}
+## 💡 専門家・当事者からの重要な指摘
+
+深い専門知識や実務経験に基づく意見です。
+
+{% for insight in expert_insights %}
+### {{ loop.index }}. {{ insight.content }}
+
+**専門分野・経験**: {{ insight.expertise }}
+
+{% endfor %}
+{% endif %}
+
+---
+
 ## 回答者の立場分布
 
 | 立場 | 回答数 | 割合 |
@@ -65,6 +110,13 @@ REPORT_TEMPLATE = """# {{ survey_title }} - 分析レポート
 **特徴**: {{ cluster.distinguishing_features | join(', ') }}
 {% endif %}
 
+{% if cluster.representative_session_ids %}
+**参照セッション**:
+{% for session_id in cluster.representative_session_ids[:3] %}
+- [セッション {{ session_id[:8] }}...](https://depth-interview-ai.vercel.app/report/{{ session_id }})
+{% endfor %}
+{% endif %}
+
 {% endfor %}
 
 ---
@@ -99,6 +151,10 @@ REPORT_TEMPLATE = """# {{ survey_title }} - 分析レポート
 **独自キーワード**: {{ opinion.unique_keywords | join(', ') }}
 {% endif %}
 
+{% if opinion.session_id %}
+📎 [元のインタビューを見る](https://depth-interview-ai.vercel.app/report/{{ opinion.session_id }})
+{% endif %}
+
 {% endfor %}
 {% else %}
 特筆すべきマイノリティ意見は検出されませんでした。
@@ -121,6 +177,27 @@ REPORT_TEMPLATE = """# {{ survey_title }} - 分析レポート
 {% endfor %}
 
 ---
+
+{% if multi_llm_consensus %}
+## 🤖 Multi-LLM 分析結果
+
+複数のLLMモデルによる分析結果を統合しました。
+
+**合意スコア**: {{ "%.1f"|format(multi_llm_consensus.agreement_score * 100) }}%
+
+### 統合された知見
+
+{{ multi_llm_consensus.consensus_content }}
+
+{% if multi_llm_consensus.disagreements %}
+### モデル間で意見が分かれた点
+
+{% for disagreement in multi_llm_consensus.disagreements -%}
+- {{ disagreement }}
+{% endfor %}
+{% endif %}
+
+{% endif %}
 
 {% if persona_analysis %}
 ## 🎭 多視点分析（ペルソナ分析）
@@ -209,6 +286,12 @@ class ReportGenerator:
             "minority_opinions": [mo.to_dict() for mo in summary.minority_opinions],
             "recommended_actions": summary.recommended_actions,
             "caveats": summary.caveats,
+            # i-1 Grand Prix: Bill-focused insights
+            "supporting_insights": summary.supporting_insights,
+            "concerns": summary.concerns,
+            "expert_insights": summary.expert_insights,
+            # Multi-LLM consensus
+            "multi_llm_consensus": data.multi_llm_consensus,
             "persona_analysis": data.persona_analysis,
         }
         

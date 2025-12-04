@@ -11,11 +11,11 @@ from pipeline.analyzers.minority_detector import MinorityOpinion
 from .cluster_summarizer import ClusterSummary
 
 
-OVERALL_SUMMARY_PROMPT = """あなたは政策立案者向けにアンケート結果を要約する専門家です。
-以下のアンケート分析結果から、エグゼクティブサマリーと詳細な分析レポートを作成してください。
+OVERALL_SUMMARY_PROMPT = """あなたは法案検討を支援するアンケート分析の専門家です。
+以下のインタビュー分析結果から、法案を検討する際に参考になる知見を抽出し、レポートを作成してください。
 
-## アンケート情報
-- タイトル: {survey_title}
+## インタビュー情報
+- テーマ: {survey_title}
 - 総回答数: {total_responses}
 - 実施期間: {date_range}
 
@@ -29,18 +29,35 @@ OVERALL_SUMMARY_PROMPT = """あなたは政策立案者向けにアンケート�
 {minority_opinions}
 
 ## 指示
-以下の形式で包括的な分析を作成してください：
+法案検討に役立つ知見を抽出し、以下の形式で分析を作成してください。
+特に、専門知識・実務経験・当事者経験に基づく具体的な意見を重視してください。
 
 1. **エグゼクティブサマリー**: 意思決定者向けの簡潔な要約（200字以内）
-2. **主要な発見事項**: 重要な発見を5つ以内で
-3. **合意点**: 回答者間で共通している意見
-4. **対立点**: 意見が分かれている論点
-5. **推奨アクション**: 分析結果に基づく推奨事項
-6. **注意点**: 解釈時に注意すべき点
+2. **法案をサポートする知見**: 法案の内容を根拠に基づいてサポートする意見
+   - 例: 「実務においてこういう課題がある」「この法案が可決するとこういう観点で嬉しい」
+3. **法案への懸念点**: 法案の内容に関する懸念
+   - 例: 「これが実現するとこういう不都合・リスクがある」「運用コストが高い割にインパクトが小さい」
+4. **専門家・当事者からの重要な指摘**: 深い専門知識や実務経験に基づく意見
+5. **合意点**: 回答者間で共通している意見
+6. **対立点**: 意見が分かれている論点
+7. **推奨アクション**: 分析結果に基づく推奨事項
+8. **注意点**: 解釈時に注意すべき点
 
 JSON形式で出力してください：
 {{
     "executive_summary": "エグゼクティブサマリー",
+    "supporting_insights": [
+        {{"content": "サポートする知見1", "reason": "根拠や背景"}},
+        {{"content": "サポートする知見2", "reason": "根拠や背景"}}
+    ],
+    "concerns": [
+        {{"content": "懸念点1", "risk": "想定されるリスク"}},
+        {{"content": "懸念点2", "risk": "想定されるリスク"}}
+    ],
+    "expert_insights": [
+        {{"content": "専門家の指摘1", "expertise": "専門分野や経験"}},
+        {{"content": "専門家の指摘2", "expertise": "専門分野や経験"}}
+    ],
     "key_findings": ["発見1", "発見2", ...],
     "consensus_points": ["合意点1", "合意点2", ...],
     "disagreement_points": ["対立点1", "対立点2", ...],
@@ -65,6 +82,11 @@ class OverallSummary:
     recommended_actions: List[str]
     caveats: List[str]
     
+    # i-1 Grand Prix: Bill-focused insights
+    supporting_insights: List[Dict[str, str]] = field(default_factory=list)  # {"content": ..., "reason": ...}
+    concerns: List[Dict[str, str]] = field(default_factory=list)  # {"content": ..., "risk": ...}
+    expert_insights: List[Dict[str, str]] = field(default_factory=list)  # {"content": ..., "expertise": ...}
+    
     # Components
     stance_distribution: Dict[str, Dict[str, Any]] = field(default_factory=dict)
     cluster_summaries: List[ClusterSummary] = field(default_factory=list)
@@ -82,6 +104,9 @@ class OverallSummary:
             "disagreement_points": self.disagreement_points,
             "recommended_actions": self.recommended_actions,
             "caveats": self.caveats,
+            "supporting_insights": self.supporting_insights,
+            "concerns": self.concerns,
+            "expert_insights": self.expert_insights,
             "stance_distribution": self.stance_distribution,
             "cluster_summaries": [cs.to_dict() for cs in self.cluster_summaries],
             "minority_opinions": [mo.to_dict() for mo in self.minority_opinions],
@@ -182,6 +207,9 @@ class OverallSummarizer:
                 disagreement_points=data.get("disagreement_points", []),
                 recommended_actions=data.get("recommended_actions", []),
                 caveats=data.get("caveats", []),
+                supporting_insights=data.get("supporting_insights", []),
+                concerns=data.get("concerns", []),
+                expert_insights=data.get("expert_insights", []),
                 stance_distribution=stance_distribution,
                 cluster_summaries=cluster_summaries,
                 minority_opinions=minority_opinions,
@@ -198,6 +226,9 @@ class OverallSummarizer:
                 disagreement_points=[],
                 recommended_actions=[],
                 caveats=["要約の解析に失敗しました。LLMの生出力を確認してください。"],
+                supporting_insights=[],
+                concerns=[],
+                expert_insights=[],
                 stance_distribution=stance_distribution,
                 cluster_summaries=cluster_summaries,
                 minority_opinions=minority_opinions,

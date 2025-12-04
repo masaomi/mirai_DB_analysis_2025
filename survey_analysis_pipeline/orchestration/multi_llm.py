@@ -106,13 +106,26 @@ class MultiLLMOrchestrator:
         
         start_time = time.time()
         
+        # Add openrouter/ prefix if not present and using OpenRouter
+        model_name = model
+        if not model.startswith("openrouter/") and self.settings.openrouter_api_key:
+            model_name = f"openrouter/{model}"
+        
         try:
-            response = await litellm.acompletion(
-                model=model,
-                messages=messages,
-                temperature=self.settings.temperature,
-                max_tokens=self.settings.max_tokens,
-            )
+            # Build kwargs for litellm
+            kwargs = {
+                "model": model_name,
+                "messages": messages,
+                "temperature": self.settings.temperature,
+                "max_tokens": self.settings.max_tokens,
+            }
+            
+            # Add OpenRouter API key and base URL if available
+            if self.settings.openrouter_api_key:
+                kwargs["api_key"] = self.settings.openrouter_api_key
+                kwargs["api_base"] = self.settings.openrouter_base_url
+            
+            response = await litellm.acompletion(**kwargs)
             
             content = response.choices[0].message.content
             tokens = response.usage.total_tokens if response.usage else 0
