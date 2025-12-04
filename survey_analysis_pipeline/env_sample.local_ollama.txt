@@ -1,0 +1,44 @@
+# Survey Analysis Pipeline Configuration
+
+# ===================
+# LLM Provider Selection
+# ===================
+LLM_PROVIDER=ollama
+
+# ===================
+# Ollama Settings (Local LLM)
+# ===================
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=qwen3:8b
+
+# ===================
+# Analysis Settings
+# ===================
+MIN_RESPONSE_LENGTH=10
+CLUSTERING_MIN_SAMPLES=3
+MINORITY_THRESHOLD=0.1
+MINORITY_TOP_N=10
+
+# ===================
+# Summarization Settings
+# ===================
+CHUNK_SIZE=30
+MAX_TOKENS=2000
+TEMPERATURE=0.3
+
+# ===================
+# Embedding Settings
+# ===================
+EMBEDDING_MODEL=intfloat/multilingual-e5-base
+
+# ===================
+# Cache Settings
+# ===================
+CACHE_ENABLED=true
+CACHE_DIR=.cache
+
+# ===================
+# Paths
+# ===================
+DATA_DIR=../data
+OUTPUT_DIR=outputs
