@@ -21,3 +21,11 @@ echo "🎉 Ingestion complete!"
 echo ""
 echo "To start the app, run: ./start_app.sh"
 
+
+
+
+
+
+
+
+

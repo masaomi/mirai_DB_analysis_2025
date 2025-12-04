@@ -174,3 +174,11 @@ conda env list
 **セットアップ完了日**: 2025-11-23  
 **Python環境**: mirai_db_analysis_py3.11 (Python 3.11.14)
 
+
+
+
+
+
+
+
+
