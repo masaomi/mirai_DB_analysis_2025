@@ -14,29 +14,91 @@ interface MessageMetadata {
 }
 
 function parseMessageContent(content: string): { text: string; metadata: MessageMetadata | null; isJsonBlock: boolean } {
-  // Split by the separator used in the prompt
-  const separator = "\n---\n";
-  const parts = content.split(separator);
+  // Try multiple separator patterns
+  const separators = ["\n---\n", "\n\n---\n\n", "---\n", "\n---"];
   
-  if (parts.length > 1) {
-    const lastPart = parts[parts.length - 1].trim();
-    // Check if it looks like JSON
-    if (lastPart.startsWith("{")) {
-      try {
-        const metadata = JSON.parse(lastPart);
-        return { 
-          text: parts.slice(0, parts.length - 1).join(separator), 
-          metadata,
-          isJsonBlock: true
-        };
-      } catch (e) {
-        // Incomplete JSON during streaming
-        return { 
-          text: parts.slice(0, parts.length - 1).join(separator), 
-          metadata: null,
-          isJsonBlock: true
-        };
+  for (const separator of separators) {
+    const parts = content.split(separator);
+    if (parts.length > 1) {
+      const lastPart = parts[parts.length - 1].trim();
+      if (lastPart.startsWith("{") && lastPart.includes('"sources"')) {
+        try {
+          const metadata = JSON.parse(lastPart);
+          return { 
+            text: parts.slice(0, parts.length - 1).join(separator).trim(), 
+            metadata,
+            isJsonBlock: true
+          };
+        } catch (e) {
+          // Incomplete JSON during streaming - hide the JSON part
+          return { 
+            text: parts.slice(0, parts.length - 1).join(separator).trim(), 
+            metadata: null,
+            isJsonBlock: true
+          };
+        }
       }
+    }
+  }
+  
+  // Fallback: Try to find JSON block directly (even without separator)
+  // Look for { "sources": pattern
+  const jsonPattern = /\n?\s*\{\s*"sources"\s*:/;
+  const match = content.match(jsonPattern);
+  
+  if (match && match.index !== undefined) {
+    const jsonStartIndex = match.index;
+    const textPart = content.substring(0, jsonStartIndex).trim();
+    const jsonPart = content.substring(jsonStartIndex).trim();
+    
+    // Find the complete JSON by matching braces
+    let braceCount = 0;
+    let jsonEndIndex = -1;
+    let inString = false;
+    let escapeNext = false;
+    
+    for (let i = 0; i < jsonPart.length; i++) {
+      const char = jsonPart[i];
+      
+      if (escapeNext) {
+        escapeNext = false;
+        continue;
+      }
+      
+      if (char === '\\') {
+        escapeNext = true;
+        continue;
+      }
+      
+      if (char === '"' && !escapeNext) {
+        inString = !inString;
+        continue;
+      }
+      
+      if (!inString) {
+        if (char === '{') braceCount++;
+        if (char === '}') {
+          braceCount--;
+          if (braceCount === 0) {
+            jsonEndIndex = i + 1;
+            break;
+          }
+        }
+      }
+    }
+    
+    if (jsonEndIndex > 0) {
+      const jsonString = jsonPart.substring(0, jsonEndIndex);
+      try {
+        const metadata = JSON.parse(jsonString);
+        return { text: textPart, metadata, isJsonBlock: true };
+      } catch (e) {
+        // JSON parse failed, still hide it
+        return { text: textPart, metadata: null, isJsonBlock: true };
+      }
+    } else {
+      // Incomplete JSON (still streaming)
+      return { text: textPart, metadata: null, isJsonBlock: true };
     }
   }
   
