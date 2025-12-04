@@ -186,8 +186,13 @@ function formatRAGResults(results: RAGResult[]): string {
     
     context += `\n${prefix} (${i + 1}/${results.length})\n`;
     
-    if (type === "response" && r.metadata.question) {
-      context += `質問: ${r.metadata.question.substring(0, 100)}...\n`;
+    if (type === "response") {
+      if (r.metadata.question) {
+        context += `質問: ${r.metadata.question.substring(0, 100)}...\n`;
+      }
+      if (r.metadata.session_id) {
+        context += `セッションID: ${r.metadata.session_id}\n`;
+      }
     }
     
     context += `内容: ${r.content.substring(0, 300)}${r.content.length > 300 ? "..." : ""}\n`;
@@ -268,6 +273,7 @@ export async function POST(req: NextRequest) {
 ${mode === "rag" ? `【RAGモード】
 RAG検索により、質問に関連する個別回答も取得しています。
 これらの具体的な回答例を引用しながら、より詳細な回答を提供してください。
+特定の回答を引用する場合は、「セッションID」を用いて出典を明示してください。
 ` : `【シンプルモード】
 分析レポートの要約データに基づいて回答しています。
 `}
@@ -278,6 +284,22 @@ RAG検索により、質問に関連する個別回答も取得しています�
 - 具体的な回答例がある場合は、それを引用して説明してください。
 - 簡潔かつ客観的に答えてください。
 - 日本語で答えてください。
+
+【重要】回答のフォーマットについて:
+回答の本文が終わった後に、必ず以下の形式で「区切り線」「参照元リスト」「次の質問候補」を出力してください。
+これはシステムがパースしてUI表示するために必須です。JSON形式は厳密に守ってください。
+
+---
+{
+  "sources": [
+    { "id": "セッションID", "title": "セッションの概要または質問内容" }
+  ],
+  "suggestedQuestions": [
+    "この回答に関連する深掘り質問1",
+    "この回答に関連する深掘り質問2",
+    "この回答に関連する深掘り質問3"
+  ]
+}
 
 === 分析データ ===
 ${context}

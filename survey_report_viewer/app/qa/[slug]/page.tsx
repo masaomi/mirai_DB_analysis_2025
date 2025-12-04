@@ -1,27 +1,76 @@
 "use client";
 
 import { useChat } from "ai/react";
-import { useParams, useSearchParams } from "next/navigation";
+import { useParams, useSearchParams, useRouter } from "next/navigation";
 import { useState, useRef, useEffect, Suspense } from "react";
 import Link from "next/link";
-import { Send, ArrowLeft, Bot, User, Info, Database, FileText } from "lucide-react";
+import { Send, ArrowLeft, Bot, User, Info, Database, FileText, ExternalLink, HelpCircle } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+
+interface MessageMetadata {
+  sources?: Array<{ id: string; title: string }>;
+  suggestedQuestions?: string[];
+}
+
+function parseMessageContent(content: string): { text: string; metadata: MessageMetadata | null; isJsonBlock: boolean } {
+  // Split by the separator used in the prompt
+  const separator = "\n---\n";
+  const parts = content.split(separator);
+  
+  if (parts.length > 1) {
+    const lastPart = parts[parts.length - 1].trim();
+    // Check if it looks like JSON
+    if (lastPart.startsWith("{")) {
+      try {
+        const metadata = JSON.parse(lastPart);
+        return { 
+          text: parts.slice(0, parts.length - 1).join(separator), 
+          metadata,
+          isJsonBlock: true
+        };
+      } catch (e) {
+        // Incomplete JSON during streaming
+        return { 
+          text: parts.slice(0, parts.length - 1).join(separator), 
+          metadata: null,
+          isJsonBlock: true
+        };
+      }
+    }
+  }
+  
+  return { text: content, metadata: null, isJsonBlock: false };
+}
 
 function QAContent() {
   const params = useParams();
   const searchParams = useSearchParams();
+  const router = useRouter();
   const slug = params.slug as string;
   const mode = searchParams.get("mode") || "simple";
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const { messages, input, handleInputChange, handleSubmit, isLoading, error } = useChat({
+  const { messages, input, handleInputChange, handleSubmit, isLoading, error, append } = useChat({
     api: `/api/qa?mode=${mode}`,
     body: { slug },
     onError: (error) => {
       console.error("Chat error:", error);
     },
   });
+
+  // Initial query from URL (for drill-down)
+  useEffect(() => {
+    const initialQuery = searchParams.get("q");
+    if (initialQuery && messages.length === 0 && !isLoading) {
+      // Remove query param to avoid re-triggering on refresh
+      const newUrl = new URL(window.location.href);
+      newUrl.searchParams.delete("q");
+      window.history.replaceState({}, "", newUrl.toString());
+      
+      append({ role: "user", content: initialQuery });
+    }
+  }, [searchParams, messages.length, isLoading, append]);
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -117,7 +166,7 @@ function QAContent() {
               </p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-left max-w-2xl mx-auto">
                 <button
-                  onClick={() => handleInputChange({ target: { value: "賛成派の主な理由は？" } } as any)}
+                  onClick={() => append({ role: "user", content: "賛成派の主な理由は？" })}
                   className={`p-3 bg-white border rounded-md text-sm text-gray-700 transition-colors ${
                     isRAGMode ? "hover:bg-purple-50 border-purple-200" : "hover:bg-blue-50 border-blue-200"
                   }`}
@@ -125,7 +174,7 @@ function QAContent() {
                   賛成派の主な理由は？
                 </button>
                 <button
-                  onClick={() => handleInputChange({ target: { value: "どのような懸念点がありますか？" } } as any)}
+                  onClick={() => append({ role: "user", content: "どのような懸念点がありますか？" })}
                   className={`p-3 bg-white border rounded-md text-sm text-gray-700 transition-colors ${
                     isRAGMode ? "hover:bg-purple-50 border-purple-200" : "hover:bg-blue-50 border-blue-200"
                   }`}
@@ -133,7 +182,7 @@ function QAContent() {
                   どのような懸念点がありますか？
                 </button>
                 <button
-                  onClick={() => handleInputChange({ target: { value: isRAGMode ? "セキュリティについての具体的な意見は？" : "少数派の意見を教えて" } } as any)}
+                  onClick={() => append({ role: "user", content: isRAGMode ? "セキュリティについての具体的な意見は？" : "少数派の意見を教えて" })}
                   className={`p-3 bg-white border rounded-md text-sm text-gray-700 transition-colors ${
                     isRAGMode ? "hover:bg-purple-50 border-purple-200" : "hover:bg-blue-50 border-blue-200"
                   }`}
@@ -141,7 +190,7 @@ function QAContent() {
                   {isRAGMode ? "セキュリティについての具体的な意見は？" : "少数派の意見を教えて"}
                 </button>
                 <button
-                  onClick={() => handleInputChange({ target: { value: isRAGMode ? "電子化に反対する人の理由を教えて" : "最大クラスタの特徴は？" } } as any)}
+                  onClick={() => append({ role: "user", content: isRAGMode ? "電子化に反対する人の理由を教えて" : "最大クラスタの特徴は？" })}
                   className={`p-3 bg-white border rounded-md text-sm text-gray-700 transition-colors ${
                     isRAGMode ? "hover:bg-purple-50 border-purple-200" : "hover:bg-blue-50 border-blue-200"
                   }`}
@@ -153,44 +202,115 @@ function QAContent() {
           )}
 
           {/* Messages */}
-          {messages.map((m) => (
-            <div
-              key={m.id}
-              className={`flex gap-4 ${m.role === "user" ? "justify-end" : "justify-start"}`}
-            >
-              {m.role === "assistant" && (
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mt-1 ${
-                  isRAGMode ? "bg-purple-100 text-purple-600" : "bg-blue-100 text-blue-600"
-                }`}>
-                  <Bot size={16} />
-                </div>
-              )}
-              
+          {messages.map((m) => {
+            const { text, metadata, isJsonBlock } = m.role === "assistant" 
+              ? parseMessageContent(m.content) 
+              : { text: m.content, metadata: null, isJsonBlock: false };
+            
+            return (
               <div
-                className={`max-w-[85%] md:max-w-[75%] rounded-2xl px-5 py-3 shadow-sm ${
-                  m.role === "user"
-                    ? `${isRAGMode ? "bg-purple-600" : "bg-blue-600"} text-white rounded-tr-none`
-                    : "bg-white border border-gray-100 text-gray-800 rounded-tl-none"
-                }`}
+                key={m.id}
+                className={`flex gap-4 ${m.role === "user" ? "justify-end" : "justify-start"}`}
               >
-                {m.role === "user" ? (
-                  <div className="whitespace-pre-wrap">{m.content}</div>
-                ) : (
-                  <div className="prose prose-sm max-w-none dark:prose-invert">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                      {m.content}
-                    </ReactMarkdown>
+                {m.role === "assistant" && (
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mt-1 ${
+                    isRAGMode ? "bg-purple-100 text-purple-600" : "bg-blue-100 text-blue-600"
+                  }`}>
+                    <Bot size={16} />
+                  </div>
+                )}
+                
+                <div className="flex flex-col max-w-[85%] md:max-w-[75%] gap-2">
+                  <div
+                    className={`rounded-2xl px-5 py-3 shadow-sm ${
+                      m.role === "user"
+                        ? `${isRAGMode ? "bg-purple-600" : "bg-blue-600"} text-white rounded-tr-none`
+                        : "bg-white border border-gray-100 text-gray-800 rounded-tl-none"
+                    }`}
+                  >
+                    {m.role === "user" ? (
+                      <div className="whitespace-pre-wrap">{m.content}</div>
+                    ) : (
+                      <div className="prose prose-sm max-w-none dark:prose-invert">
+                        <ReactMarkdown 
+                          remarkPlugins={[remarkGfm]}
+                          components={{
+                            a: ({ node, ...props }) => (
+                              <a {...props} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline" />
+                            )
+                          }}
+                        >
+                          {text}
+                        </ReactMarkdown>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Metadata Display (Sources & Suggestions) */}
+                  {m.role === "assistant" && metadata && (
+                    <div className="flex flex-col gap-3 animate-fadeIn">
+                      {/* Sources */}
+                      {metadata.sources && metadata.sources.length > 0 && (
+                        <div className="bg-white border border-gray-200 rounded-xl p-3 text-sm">
+                          <h4 className="font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                            <Database size={14} />
+                            参照元セッション
+                          </h4>
+                          <ul className="space-y-2">
+                            {metadata.sources.map((source, idx) => (
+                              <li key={idx}>
+                                <a 
+                                  href={`https://depth-interview-ai.vercel.app/report/${source.id}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex items-center gap-2 text-blue-600 hover:text-blue-800 transition-colors group"
+                                >
+                                  <ExternalLink size={14} className="flex-shrink-0" />
+                                  <span className="truncate hover:underline">{source.title || `セッション ${source.id.substring(0, 8)}...`}</span>
+                                </a>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {/* Suggested Questions */}
+                      {metadata.suggestedQuestions && metadata.suggestedQuestions.length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                          {metadata.suggestedQuestions.map((q, idx) => (
+                            <button
+                              key={idx}
+                              onClick={() => append({ role: "user", content: q })}
+                              disabled={isLoading}
+                              className={`text-sm px-3 py-1.5 rounded-full border bg-white hover:bg-gray-50 transition-colors text-left flex items-center gap-1.5 ${
+                                isRAGMode ? "text-purple-700 border-purple-200" : "text-blue-700 border-blue-200"
+                              }`}
+                            >
+                              <HelpCircle size={14} />
+                              {q}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  
+                  {/* Parsing Indicator */}
+                  {m.role === "assistant" && isJsonBlock && !metadata && (
+                    <div className="text-xs text-gray-400 italic pl-2">
+                      関連情報を取得中...
+                    </div>
+                  )}
+                </div>
+
+                {m.role === "user" && (
+                  <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0 text-gray-500 mt-1">
+                    <User size={16} />
                   </div>
                 )}
               </div>
-
-              {m.role === "user" && (
-                <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0 text-gray-500 mt-1">
-                  <User size={16} />
-                </div>
-              )}
-            </div>
-          ))}
+            );
+          })}
 
           {/* Loading Indicator */}
           {isLoading && (
