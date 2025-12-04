@@ -190,6 +190,165 @@ class ChartGenerator:
         
         return output_path
     
+    def generate_cluster_treemap(
+        self,
+        cluster_details: List[Dict[str, Any]],
+        output_path: Path,
+    ) -> Path:
+        """Generate treemap for cluster distribution.
+        
+        Args:
+            cluster_details: List of cluster info with size and keywords
+            output_path: Path to save the chart
+            
+        Returns:
+            Path to saved chart
+        """
+        import plotly.express as px
+        import plotly.io as pio
+        
+        if not cluster_details:
+            return None
+        
+        # Prepare data for treemap
+        labels = []
+        sizes = []
+        parents = []
+        hover_texts = []
+        
+        # Root node
+        total_size = sum(c['size'] for c in cluster_details)
+        
+        for c in cluster_details:
+            label = c.get('label', f"クラスタ {c['cluster_id']}")
+            keywords = c.get('keywords', [])[:3]
+            size = c['size']
+            
+            # Create label with keywords
+            if keywords:
+                display_label = f"{label}<br>({', '.join(keywords)})"
+            else:
+                display_label = label
+            
+            labels.append(display_label)
+            sizes.append(size)
+            parents.append("")  # Root level
+            
+            # Hover text with sample responses
+            samples = c.get('sample_responses', [])
+            hover = f"<b>{label}</b><br>回答数: {size}件<br>"
+            if keywords:
+                hover += f"キーワード: {', '.join(keywords)}<br>"
+            if samples:
+                hover += f"<br>サンプル: {samples[0][:100]}..."
+            hover_texts.append(hover)
+        
+        # Create treemap
+        fig = px.treemap(
+            names=labels,
+            parents=parents,
+            values=sizes,
+            title=f'クラスタ分布 (全{len(cluster_details)}クラスタ, {total_size}回答)',
+        )
+        
+        fig.update_traces(
+            hovertemplate='%{customdata}<extra></extra>',
+            customdata=hover_texts,
+            textinfo='label+value+percent root',
+            textfont_size=12,
+        )
+        
+        fig.update_layout(
+            font=dict(family='Hiragino Sans, Yu Gothic, sans-serif'),
+            margin=dict(t=50, l=25, r=25, b=25),
+        )
+        
+        # Save as HTML (interactive)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        html_path = output_path.with_suffix('.html')
+        pio.write_html(fig, html_path)
+        
+        # Also save as PNG (static)
+        png_path = output_path.with_suffix('.png')
+        try:
+            fig.write_image(png_path, width=1200, height=800)
+        except Exception:
+            # Kaleido not installed, skip PNG
+            pass
+        
+        return html_path
+    
+    def generate_top_clusters_bar_chart(
+        self,
+        cluster_details: List[Dict[str, Any]],
+        output_path: Path,
+        top_n: int = 15,
+    ) -> Path:
+        """Generate horizontal bar chart for top N clusters.
+        
+        Args:
+            cluster_details: List of cluster info with size and keywords
+            output_path: Path to save the chart
+            top_n: Number of top clusters to show
+            
+        Returns:
+            Path to saved chart
+        """
+        if not cluster_details:
+            return None
+        
+        # Sort by size and take top N
+        sorted_clusters = sorted(cluster_details, key=lambda x: x['size'], reverse=True)[:top_n]
+        sorted_clusters.reverse()  # Reverse for bottom-to-top display
+        
+        # Prepare data
+        labels = []
+        sizes = []
+        colors = []
+        
+        for c in sorted_clusters:
+            keywords = c.get('keywords', [])[:2]
+            label = c.get('label', f"クラスタ {c['cluster_id']}")
+            
+            if keywords:
+                label = f"{label} ({', '.join(keywords)})"
+            
+            labels.append(label)
+            sizes.append(c['size'])
+            
+            # Color based on cluster type
+            if c.get('cluster_id') == -1:
+                colors.append('#9E9E9E')  # Gray for noise
+            else:
+                colors.append('#2196F3')  # Blue for regular clusters
+        
+        # Create bar chart
+        fig, ax = plt.subplots(figsize=(12, max(6, len(sorted_clusters) * 0.4)))
+        
+        bars = ax.barh(labels, sizes, color=colors)
+        
+        # Add value labels
+        for bar, size in zip(bars, sizes):
+            ax.text(
+                bar.get_width() + max(sizes) * 0.01,
+                bar.get_y() + bar.get_height() / 2,
+                f'{size}件',
+                va='center',
+                fontsize=10,
+            )
+        
+        ax.set_xlabel('回答数', fontsize=12)
+        ax.set_title(f'上位{len(sorted_clusters)}クラスタの回答数分布', fontsize=14, fontweight='bold')
+        ax.set_xlim(0, max(sizes) * 1.15)
+        
+        # Save
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        plt.tight_layout()
+        plt.savefig(output_path, dpi=150, bbox_inches='tight', facecolor='white')
+        plt.close()
+        
+        return output_path
+    
     def generate_scatter_plot_data(
         self,
         embeddings_2d: List[List[float]],
@@ -251,14 +410,32 @@ class ChartGenerator:
             if path:
                 outputs['stance_distribution'] = path
         
-        # Cluster bar chart
-        if 'cluster_summaries' in analysis_results:
+        # Cluster bar chart (from LLM summaries)
+        if 'cluster_summaries' in analysis_results and analysis_results['cluster_summaries']:
             path = self.generate_cluster_bar_chart(
                 analysis_results['cluster_summaries'],
                 charts_dir / "cluster_sizes.png",
             )
             if path:
                 outputs['cluster_sizes'] = path
+        
+        # Cluster treemap (from cluster details)
+        if 'cluster_details' in analysis_results and analysis_results['cluster_details']:
+            path = self.generate_cluster_treemap(
+                analysis_results['cluster_details'],
+                charts_dir / "cluster_treemap",
+            )
+            if path:
+                outputs['cluster_treemap'] = path
+        
+        # Top clusters bar chart
+        if 'cluster_details' in analysis_results and analysis_results['cluster_details']:
+            path = self.generate_top_clusters_bar_chart(
+                analysis_results['cluster_details'],
+                charts_dir / "top_clusters.png",
+            )
+            if path:
+                outputs['top_clusters'] = path
         
         # Word cloud
         if 'response_texts' in analysis_results:

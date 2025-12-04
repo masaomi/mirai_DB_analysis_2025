@@ -293,6 +293,22 @@ async def _run_pipeline(
             for fmt, path in outputs.items():
                 console.print(f"  ✓ Saved {fmt}: {path}")
         
+        # Build cluster details for visualization (needed for charts and data export)
+        import json
+        
+        cluster_details = []
+        for c in clusters:
+            cluster_details.append({
+                "cluster_id": int(c.cluster_id),  # Convert numpy int64 to Python int
+                "label": c.label,
+                "size": int(c.size),
+                "keywords": c.keywords,
+                "sample_responses": [r.content[:200] for r in c.responses[:3]],
+            })
+        
+        # Sort by size descending
+        cluster_details.sort(key=lambda x: x['size'], reverse=True)
+        
         # Charts
         if not skip_charts:
             task = progress.add_task("[cyan]Generating charts...", total=None)
@@ -301,6 +317,7 @@ async def _run_pipeline(
             analysis_results = {
                 'stance_distribution': stance_distribution,
                 'cluster_summaries': [cs.to_dict() for cs in cluster_summaries] if cluster_summaries else [],
+                'cluster_details': cluster_details,
                 'response_texts': [r.content for r in extraction_result.responses],
             }
             
@@ -330,8 +347,6 @@ async def _run_pipeline(
             progress.update(task, completed=True)
             console.print(f"  ✓ Index: {index_path}")
         
-        # Save analysis data
-        import json
         analysis_data = {
             "survey_slug": survey_slug,
             "survey_title": extraction_result.survey_title,
@@ -339,7 +354,17 @@ async def _run_pipeline(
             "response_count": extraction_result.response_count,
             "stance_distribution": stance_distribution,
             "cluster_count": len(clusters),
+            "cluster_details": cluster_details,
             "minority_count": len(minorities),
+            "minority_opinions": [
+                {
+                    "content": m.content[:300],
+                    "outlier_score": m.outlier_score,
+                    "uniqueness_reason": m.uniqueness_reason,
+                    "unique_keywords": m.unique_keywords[:5] if m.unique_keywords else [],
+                }
+                for m in minorities[:20]  # Top 20 minorities
+            ],
             "settings": {
                 "provider": settings.llm_provider.value,
                 "multi_llm": multi_llm,

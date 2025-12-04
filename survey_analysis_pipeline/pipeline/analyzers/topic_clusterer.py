@@ -1,11 +1,70 @@
 """Cluster responses by topic using embeddings."""
 
 from dataclasses import dataclass, field
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Set
 import numpy as np
 
 from pipeline.extractors.response_extractor import UserResponse
 from config.settings import Settings, get_settings
+
+
+# Japanese stopwords - common words that don't carry topic meaning
+JAPANESE_STOPWORDS: Set[str] = {
+    # Particles and conjunctions
+    "また", "ただ", "しかし", "ただし", "なお", "けど", "けれども", "でも",
+    "それで", "そして", "だから", "ので", "のに", "ため", "から", "まで",
+    "より", "ほど", "くらい", "など", "とか", "やら", "なり", "つまり",
+    "すなわち", "あるいは", "または", "もしくは", "ならびに", "および",
+    # Fillers and responses
+    "はい", "ええ", "うん", "いいえ", "いや", "いえ", "なるほど", "そうですね",
+    "そうですか", "そうなんですね", "そう", "ですね", "ですか", "ですが",
+    "ああ", "おお", "ふむ", "へえ", "まあ", "えーと", "あの", "その",
+    "うーん", "えー", "んー", "あー", "おー", "えっと", "まぁ",
+    "そうです", "そうですよね", "そうだと思います", "わかりました",
+    "ごめんなさい", "すみません", "申し訳", "ありがとう", "よろしく",
+    "ありがとうございました", "ありがとうございます", "頑張ってください",
+    "こちらこそ", "こちらこそありがとうございました", "お願いします",
+    "失礼します", "失礼しました", "よろしくお願いします",
+    # Pronouns and demonstratives
+    "これ", "それ", "あれ", "どれ", "この", "その", "あの", "どの",
+    "ここ", "そこ", "あそこ", "どこ", "こちら", "そちら", "あちら",
+    "わたし", "私", "僕", "俺", "自分", "あなた", "彼", "彼女",
+    # Common verbs (conjugated forms)
+    "する", "します", "した", "しました", "される", "できる", "できます",
+    "ある", "あります", "あった", "ありました", "ない", "ありません",
+    "いる", "います", "いた", "いました", "いない", "いません",
+    "なる", "なります", "なった", "なりました", "思う", "思います",
+    "思った", "思いました", "言う", "言います", "言った", "言いました",
+    "知る", "知ります", "知った", "知りました", "知らない", "知りません",
+    "見る", "見ます", "見た", "見ました", "聞く", "聞きます", "聞いた",
+    "考える", "考えます", "考えた", "使う", "使います", "持つ", "持ちます",
+    # Common adjectives
+    "いい", "良い", "よい", "悪い", "多い", "少ない", "大きい", "小さい",
+    "高い", "低い", "長い", "短い", "新しい", "古い", "難しい", "易しい",
+    # Common adverbs and discourse markers
+    "とても", "非常に", "かなり", "少し", "ちょっと", "もう", "まだ",
+    "すでに", "やはり", "やっぱり", "もっと", "さらに", "特に", "全く",
+    "本当に", "実際", "実際に", "基本的に", "一般的に", "具体的に",
+    "例えば", "たとえば", "あと", "まず", "次に", "最後に", "では",
+    "ところで", "さて", "ちなみに", "要するに", "結局", "結局は",
+    "確かに", "もちろん", "当然", "おそらく", "たぶん", "多分", "きっと",
+    # Generic expressions
+    "こと", "もの", "ところ", "わけ", "よう", "ほう", "はず", "つもり",
+    "点", "面", "部分", "場合", "時", "方", "人", "形", "感じ",
+    "意味", "理由", "結果", "影響", "問題", "必要", "可能", "重要",
+    "状況", "状態", "内容", "程度", "範囲", "対象", "関係", "観点",
+    # Question/answer patterns
+    "何", "なに", "どう", "どのように", "なぜ", "どうして", "いつ", "どこで",
+    # Numbers and counters
+    "一つ", "二つ", "三つ", "一", "二", "三", "年", "月", "日",
+    # Other common words
+    "今", "前", "後", "中", "上", "下", "間", "次", "最初", "最後",
+    "全て", "すべて", "みんな", "皆", "他", "別", "同じ", "違う",
+    "色々", "様々", "いろいろ", "さまざま", "等", "的",
+    # Interview-specific generic words
+    "質問", "回答", "意見", "考え", "お話", "説明", "ご説明",
+    "インタビュー", "アンケート", "調査",
+}
 
 
 @dataclass
@@ -149,14 +208,11 @@ class TopicClusterer:
             # Compute centroid
             centroid = cluster_embeddings.mean(axis=0)
             
-            # Generate label
-            if cluster_id == -1:
-                label = "その他（未分類）"
-            else:
-                label = f"クラスタ {cluster_id + 1}"
-            
-            # Extract keywords using TF-IDF
+            # Extract keywords using TF-IDF (with stopword filtering)
             keywords = self._extract_cluster_keywords(cluster_responses)
+            
+            # Generate meaningful label based on keywords
+            label = self._generate_cluster_label(cluster_responses, keywords, cluster_id)
             
             results.append(ClusterResult(
                 cluster_id=cluster_id,
@@ -173,14 +229,14 @@ class TopicClusterer:
         responses: List[UserResponse],
         top_n: int = 5,
     ) -> List[str]:
-        """Extract keywords from cluster using TF-IDF.
+        """Extract keywords from cluster using TF-IDF with stopword filtering.
         
         Args:
             responses: Responses in cluster
             top_n: Number of keywords to extract
             
         Returns:
-            List of keyword strings
+            List of keyword strings (filtered for meaningful words)
         """
         if not responses:
             return []
@@ -191,10 +247,10 @@ class TopicClusterer:
         
         try:
             vectorizer = TfidfVectorizer(
-                max_features=100,
+                max_features=200,
                 token_pattern=r'(?u)\b\w\w+\b',
                 max_df=0.8,
-                min_df=1,
+                min_df=2 if len(texts) > 10 else 1,
             )
             
             tfidf_matrix = vectorizer.fit_transform(texts)
@@ -203,14 +259,118 @@ class TopicClusterer:
             # Get average TF-IDF scores
             avg_scores = tfidf_matrix.mean(axis=0).A1
             
-            # Get top keywords
-            top_indices = avg_scores.argsort()[-top_n:][::-1]
-            keywords = [feature_names[i] for i in top_indices]
+            # Get sorted indices by score
+            sorted_indices = avg_scores.argsort()[::-1]
+            
+            # Filter out stopwords and collect top keywords
+            keywords = []
+            for idx in sorted_indices:
+                word = feature_names[idx]
+                # Skip stopwords, single characters, and numeric strings
+                if (word not in JAPANESE_STOPWORDS and 
+                    len(word) > 1 and 
+                    not word.isdigit()):
+                    keywords.append(word)
+                    if len(keywords) >= top_n:
+                        break
             
             return keywords
             
         except Exception:
             return []
+    
+    def _generate_cluster_label(
+        self,
+        responses: List[UserResponse],
+        keywords: List[str],
+        cluster_id: int,
+    ) -> str:
+        """Generate a meaningful label for a cluster based on its content.
+        
+        Args:
+            responses: Responses in cluster
+            keywords: Extracted keywords
+            cluster_id: Cluster ID
+            
+        Returns:
+            Human-readable cluster label
+        """
+        if cluster_id == -1:
+            return "その他（未分類）"
+        
+        if not keywords:
+            # Try to extract key phrases from sample responses
+            sample_phrases = self._extract_key_phrases(responses[:5])
+            if sample_phrases:
+                return f"「{sample_phrases[0]}」"
+            return f"クラスタ {cluster_id + 1}"
+        
+        # Use top 2 keywords to form a label (shorter is better for display)
+        if len(keywords) >= 2:
+            # Join top keywords with appropriate connector
+            label_keywords = keywords[:2]
+            label = f"「{'・'.join(label_keywords)}」"
+        else:
+            label = f"「{keywords[0]}」"
+        
+        return label
+    
+    def _extract_key_phrases(
+        self,
+        responses: List[UserResponse],
+        max_length: int = 20,
+    ) -> List[str]:
+        """Extract key phrases from responses for labeling.
+        
+        Args:
+            responses: Sample responses
+            max_length: Maximum phrase length
+            
+        Returns:
+            List of key phrases
+        """
+        import re
+        
+        # Additional phrases to filter (not stopwords, but not meaningful for labels)
+        LABEL_STOPWORDS = {
+            "ありがとう", "ありがとうございました", "ありがとうございます",
+            "聞いてくれてありがとう", "こちらこそありがとう",
+        }
+        
+        phrases = []
+        for resp in responses:
+            content = resp.content
+            
+            # Extract quoted phrases 「」or key patterns
+            quoted = re.findall(r'「([^」]{3,20})」', content)
+            if quoted:
+                phrases.extend(quoted)
+            
+            # Extract noun phrases (simple heuristic: consecutive kanji/katakana)
+            noun_patterns = re.findall(r'[一-龯ァ-ヴー]{3,15}', content)
+            for np in noun_patterns:
+                if (np not in JAPANESE_STOPWORDS and 
+                    np not in LABEL_STOPWORDS and
+                    len(np) <= max_length):
+                    phrases.append(np)
+        
+        # Deduplicate while preserving order
+        seen = set()
+        unique_phrases = []
+        for p in phrases:
+            if (p not in seen and 
+                p not in JAPANESE_STOPWORDS and
+                p not in LABEL_STOPWORDS):
+                seen.add(p)
+                unique_phrases.append(p)
+        
+        # If all phrases were filtered, check if it's a "thank you" cluster
+        if not unique_phrases:
+            combined = ' '.join([r.content for r in responses])
+            if 'ありがとう' in combined:
+                return ["挨拶・お礼"]
+        
+        return unique_phrases[:3]
     
     def reduce_dimensions(
         self,
