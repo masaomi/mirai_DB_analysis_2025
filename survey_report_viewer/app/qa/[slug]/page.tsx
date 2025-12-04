@@ -311,30 +311,38 @@ function QAContent() {
                   {/* Metadata Display (Sources & Suggestions) */}
                   {m.role === "assistant" && metadata && (
                     <div className="flex flex-col gap-3 animate-fadeIn">
-                      {/* Sources */}
-                      {metadata.sources && metadata.sources.length > 0 && (
-                        <div className="bg-white border border-gray-200 rounded-xl p-3 text-sm">
-                          <h4 className="font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                            <Database size={14} />
-                            参照元セッション
-                          </h4>
-                          <ul className="space-y-2">
-                            {metadata.sources.map((source, idx) => (
-                              <li key={idx}>
-                                <a 
-                                  href={`https://depth-interview-ai.vercel.app/report/${source.id}`}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="flex items-center gap-2 text-blue-600 hover:text-blue-800 transition-colors group"
-                                >
-                                  <ExternalLink size={14} className="flex-shrink-0" />
-                                  <span className="truncate hover:underline">{source.title || `セッション ${source.id.substring(0, 8)}...`}</span>
-                                </a>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
+                      {/* Sources - Only show if valid session IDs exist (UUID format) */}
+                      {(() => {
+                        // Filter sources to only include valid UUIDs
+                        const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+                        const validSources = metadata.sources?.filter(s => s.id && uuidPattern.test(s.id)) || [];
+                        
+                        if (validSources.length === 0) return null;
+                        
+                        return (
+                          <div className="bg-white border border-gray-200 rounded-xl p-3 text-sm">
+                            <h4 className="font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                              <Database size={14} />
+                              参照元セッション
+                            </h4>
+                            <ul className="space-y-2">
+                              {validSources.map((source, idx) => (
+                                <li key={idx}>
+                                  <a 
+                                    href={`https://depth-interview-ai.vercel.app/report/${source.id}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex items-center gap-2 text-blue-600 hover:text-blue-800 transition-colors group"
+                                  >
+                                    <ExternalLink size={14} className="flex-shrink-0" />
+                                    <span className="truncate hover:underline">{source.title || `セッション ${source.id.substring(0, 8)}...`}</span>
+                                  </a>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        );
+                      })()}
 
                       {/* Suggested Questions */}
                       {metadata.suggestedQuestions && metadata.suggestedQuestions.length > 0 && (
