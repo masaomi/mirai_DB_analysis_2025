@@ -1,6 +1,9 @@
 survey_rag_app/chroma_db/
 .DS_Store
 bak
+cursor_log/
+command.log
+survey_rag_app/chroma_db_backup*
 
 # Survey Analysis Pipeline
 survey_analysis_pipeline/.env
