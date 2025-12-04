@@ -1,9 +1,14 @@
 survey_rag_app/chroma_db/
 .DS_Store
-bak
+bak/
 cursor_log/
 command.log
 survey_rag_app/chroma_db_backup*
+
+# Backup data files (sensitive data)
+data/
+*.sql
+backup-*.json
 
 # Survey Analysis Pipeline
 survey_analysis_pipeline/.env
