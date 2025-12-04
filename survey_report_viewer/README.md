@@ -4,15 +4,44 @@
 
 ## 機能
 
-- **レポート表示**: Markdown形式のレポートをHTML表示
+- **レポート一覧**: 利用可能なレポートをカード形式で表示
+- **レポート詳細**: Markdown形式のレポートをHTML表示
 - **チャート表示**: 分析パイプラインで生成されたチャートを表示
-- **Q&A Chat**: レポートについてLLMに質問できるRAG + Chat機能 (実装予定)
+- **Q&A Chat**: レポートについてLLMに質問できるチャット機能
+  - **シンプルモード**: レポートと分析データをコンテキストとして使用
+  - **RAGモード**: ChromaDBでセマンティック検索して関連回答を取得
+
+## システム構成
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Next.js Application                       │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐  │
+│  │ レポート一覧 │  │ レポート詳細 │  │    Q&A Chat        │  │
+│  │   /         │  │ /reports/   │  │    /qa/[slug]      │  │
+│  └─────────────┘  └─────────────┘  └─────────────────────┘  │
+│                                              │               │
+│  ┌─────────────────────────────────────────────────────────┐│
+│  │                    API Routes                           ││
+│  │  /api/reports  /api/charts  /api/qa                    ││
+│  └─────────────────────────────────────────────────────────┘│
+└────────────────────────────┬────────────────────────────────┘
+                             │
+         ┌───────────────────┼───────────────────┐
+         │                   │                   │
+         ▼                   ▼                   ▼
+┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐
+│ RAG Server      │ │ LLM Provider    │ │ Static Files    │
+│ (port 8001)     │ │ Bedrock/Ollama  │ │ outputs/        │
+└─────────────────┘ └─────────────────┘ └─────────────────┘
+```
 
 ## 前提条件
 
 - Node.js 18以上
 - pnpm (推奨) または npm
 - `survey_analysis_pipeline/` でレポートが生成されていること
+- RAGモード使用時: RAGサーバーが起動していること
 
 ## インストール
 
@@ -46,33 +75,47 @@ npm run dev
 ```bash
 pnpm build
 pnpm start
+
+# ポート指定
+PORT=3002 pnpm start
 ```
 
-## ディレクトリ構成
+### Q&A機能の使用
+
+#### シンプルモード（デフォルト）
+
+レポートと分析データをLLMのコンテキストとして使用します。
+RAGサーバー不要で動作します。
 
 ```
-survey_report_viewer/
-├── app/
-│   ├── api/
-│   │   ├── charts/[slug]/[filename]/route.ts  # チャート配信API
-│   │   ├── qa/route.ts                        # Q&A API (LLM統合予定)
-│   │   └── reports/                           # レポート取得API
-│   │       ├── route.ts                       # 一覧取得
-│   │       └── [slug]/route.ts                # 詳細取得
-│   ├── reports/[slug]/page.tsx                # レポート詳細ページ
-│   ├── qa/[slug]/page.tsx                     # Q&Aチャットページ (未実装)
-│   ├── globals.css                            # グローバルスタイル
-│   ├── layout.tsx                             # レイアウト
-│   └── page.tsx                               # ホームページ（レポート一覧）
-├── package.json
-├── tailwind.config.ts
-├── tsconfig.json
-└── next.config.ts
+http://localhost:3000/qa/bill-of-lading
+http://localhost:3000/qa/bill-of-lading?mode=simple
 ```
 
-## LLMプロバイダー設定
+#### RAGモード
 
-### Ollama (ローカル)
+ChromaDBでセマンティック検索を行い、関連する個別回答を取得します。
+RAGサーバーの起動が必要です。
+
+```bash
+# 1. RAGサーバー起動 (survey_analysis_pipeline/)
+cd ../survey_analysis_pipeline
+pixi run python rag_server.py bill-of-lading --port 8001
+
+# 2. Next.jsサーバー起動
+cd ../survey_report_viewer
+pnpm start
+```
+
+```
+http://localhost:3000/qa/bill-of-lading?mode=rag
+```
+
+## 環境変数
+
+### LLMプロバイダー設定
+
+#### Ollama (ローカル)
 
 ```env
 LLM_PROVIDER=ollama
@@ -80,7 +123,7 @@ OLLAMA_BASE_URL=http://localhost:11434
 OLLAMA_MODEL=llama3.2
 ```
 
-### Amazon Bedrock
+#### Amazon Bedrock
 
 ```env
 LLM_PROVIDER=bedrock
@@ -90,12 +133,65 @@ AWS_SECRET_ACCESS_KEY=your_secret_key
 BEDROCK_MODEL_ID=anthropic.claude-3-5-sonnet-20241022-v2:0
 ```
 
-### OpenRouter
+#### OpenRouter
 
 ```env
 LLM_PROVIDER=openrouter
 OPENROUTER_API_KEY=your_api_key
 OPENROUTER_MODEL=anthropic/claude-3.5-sonnet
+```
+
+### RAGサーバー設定
+
+```env
+RAG_SERVER_URL=http://localhost:8001
+```
+
+## API エンドポイント
+
+| エンドポイント | メソッド | 説明 |
+|--------------|---------|------|
+| `/api/reports` | GET | レポート一覧取得 |
+| `/api/reports/[slug]` | GET | レポート詳細取得 |
+| `/api/charts/[slug]/[filename]` | GET | チャート画像取得 |
+| `/api/qa` | POST | Q&A (LLMストリーミング) |
+
+### Q&A API パラメータ
+
+| パラメータ | 説明 | デフォルト |
+|-----------|------|-----------|
+| `slug` | アンケートスラッグ (URLパラメータ) | 必須 |
+| `mode` | `simple` または `rag` | `simple` |
+
+**リクエスト例:**
+
+```bash
+curl -X POST "http://localhost:3000/api/qa?slug=bill-of-lading&mode=rag" \
+  -H "Content-Type: application/json" \
+  -d '{"messages": [{"role": "user", "content": "賛成派の主な理由は？"}], "slug": "bill-of-lading"}'
+```
+
+## ディレクトリ構成
+
+```
+survey_report_viewer/
+├── app/
+│   ├── api/
+│   │   ├── charts/[slug]/[filename]/route.ts  # チャート配信
+│   │   ├── qa/route.ts                        # Q&A API (LLM + RAG)
+│   │   └── reports/                           # レポートAPI
+│   │       ├── route.ts                       # 一覧取得
+│   │       └── [slug]/route.ts                # 詳細取得
+│   ├── reports/[slug]/page.tsx                # レポート詳細ページ
+│   ├── qa/[slug]/page.tsx                     # Q&Aチャットページ
+│   ├── globals.css                            # グローバルスタイル
+│   ├── layout.tsx                             # レイアウト
+│   └── page.tsx                               # ホームページ（一覧）
+├── .env.example                               # 環境変数サンプル
+├── package.json
+├── tailwind.config.ts
+├── tsconfig.json
+└── next.config.ts
 ```
 
 ## データ連携
@@ -105,9 +201,9 @@ OPENROUTER_MODEL=anthropic/claude-3.5-sonnet
 ```
 survey_analysis_pipeline/outputs/{survey_slug}/
 ├── report.md              # Markdownレポート → レポート表示
-├── analysis_data.json     # 分析データ → メタ情報表示
+├── analysis_data.json     # 分析データ → メタ情報・Q&Aコンテキスト
 ├── charts/                # チャート画像 → チャート表示
-└── vector_index/          # RAGインデックス → Q&A機能
+└── vector_index/          # RAGインデックス → RAGモードで使用
 ```
 
 ## 実装状況
@@ -117,26 +213,44 @@ survey_analysis_pipeline/outputs/{survey_slug}/
 | レポート一覧表示 | ✅ 実装済み |
 | レポート詳細表示 | ✅ 実装済み |
 | チャート表示 | ✅ 実装済み |
-| Q&A API | ⚠️ プレースホルダー（LLM呼び出し未実装） |
-| Q&A チャットUI | ❌ 未実装 |
-| RAG検索 | ⚠️ キーワードマッチのみ（ベクトル検索未実装） |
+| Q&A チャットUI | ✅ 実装済み |
+| Q&A API (シンプルモード) | ✅ 実装済み |
+| Q&A API (RAGモード) | ✅ 実装済み |
+| ストリーミング回答 | ✅ 実装済み |
+| モード切替UI | ✅ 実装済み |
 
-## 今後の実装予定
+## 技術スタック
 
-1. **Q&Aページの実装** (`/qa/[slug]/page.tsx`)
-   - チャットUI
-   - ストリーミング回答表示
+| コンポーネント | 技術 |
+|--------------|------|
+| フレームワーク | Next.js 15 (App Router) |
+| スタイリング | Tailwind CSS |
+| LLM統合 | Vercel AI SDK |
+| LLMプロバイダー | Ollama, Amazon Bedrock, OpenRouter |
+| Markdown | react-markdown, remark-gfm |
+| アイコン | Lucide React |
 
-2. **Q&A APIのLLM統合** (`/api/qa/route.ts`)
-   - Ollama / Bedrock / OpenRouter 対応
-   - RAG（ChromaDB）との統合
-   - ストリーミングレスポンス
+## クイックスタート
 
-3. **インタラクティブチャート**
-   - Recharts / Plotlyでのインタラクティブ表示
+```bash
+# 1. survey_analysis_pipeline でレポート生成
+cd survey_analysis_pipeline
+pixi run python main.py analyze bill-of-lading
+
+# 2. RAGサーバー起動 (RAGモード使用時)
+pixi run python rag_server.py bill-of-lading --port 8001
+
+# 3. Next.js起動
+cd ../survey_report_viewer
+pnpm install
+pnpm build
+pnpm start
+
+# 4. ブラウザでアクセス
+# レポート: http://localhost:3000/reports/bill-of-lading
+# Q&A (RAG): http://localhost:3000/qa/bill-of-lading?mode=rag
+```
 
 ## ライセンス
 
 MIT
-
-

@@ -14,6 +14,32 @@
 - **レポート生成**: Markdown/HTML形式のレポート
 - **チャート生成**: 立場分布、クラスタサイズ、ワードクラウド
 - **RAGインデックス**: レポートQ&A用のベクトルインデックス
+- **RAGサーバー**: Next.js Q&A機能のためのFastAPI検索サーバー
+
+## システム構成
+
+```
+                                  ┌─────────────────────┐
+                                  │   Next.js Viewer    │
+                                  │   (port 3000)       │
+                                  └──────────┬──────────┘
+                                             │ HTTP
+                                             ▼
+┌─────────────────────┐          ┌─────────────────────┐
+│  Python CLI         │  生成    │  RAG Server         │
+│  (分析パイプライン)   │ ───────→│  (port 8001)        │
+└─────────────────────┘          └──────────┬──────────┘
+         │                                  │
+         │ 出力                             │ ChromaDB
+         ▼                                  ▼
+┌─────────────────────────────────────────────────────┐
+│  outputs/{slug}/                                     │
+│  ├── report.md           # Markdownレポート          │
+│  ├── analysis_data.json  # 分析データ                │
+│  ├── charts/             # チャート画像              │
+│  └── vector_index/       # RAGインデックス           │
+└─────────────────────────────────────────────────────┘
+```
 
 ## インストール
 
@@ -46,22 +72,71 @@ pixi run python main.py list-surveys
 
 ```bash
 # 基本分析
-pixi run python main.py analyze ai-plan-test
+pixi run python main.py analyze bill-of-lading
 
 # Multi LLM Orchestrationを有効化
-pixi run python main.py analyze ai-plan-test --multi-llm
+pixi run python main.py analyze bill-of-lading --multi-llm
 
 # Persona Assemblyを有効化
-pixi run python main.py analyze ai-plan-test --persona
+pixi run python main.py analyze bill-of-lading --persona
 
 # 両方を有効化
-pixi run python main.py analyze ai-plan-test --multi-llm --persona
+pixi run python main.py analyze bill-of-lading --multi-llm --persona
 
 # LLMプロバイダーを指定
-pixi run python main.py analyze ai-plan-test --provider bedrock
+pixi run python main.py analyze bill-of-lading --provider bedrock
 
 # 出力ディレクトリを指定
-pixi run python main.py analyze ai-plan-test --output ./my_output
+pixi run python main.py analyze bill-of-lading --output ./my_output
+```
+
+### RAGインデックス構築
+
+分析後、個別にRAGインデックスを構築できます：
+
+```bash
+# インデックス構築
+pixi run python main.py build-index bill-of-lading
+
+# 出力ディレクトリ指定
+pixi run python main.py build-index bill-of-lading --output ./my_output
+```
+
+### RAGサーバー起動
+
+Next.js Q&A機能のためのRAGサーバーを起動：
+
+```bash
+# RAGサーバー起動 (デフォルト: port 8001)
+pixi run python rag_server.py bill-of-lading
+
+# ポート指定
+pixi run python rag_server.py bill-of-lading --port 8001
+
+# ホスト指定
+pixi run python rag_server.py bill-of-lading --host 0.0.0.0 --port 8001
+```
+
+**RAGサーバーAPIエンドポイント:**
+
+| エンドポイント | メソッド | 説明 |
+|--------------|---------|------|
+| `/health` | GET | ヘルスチェック |
+| `/metadata` | GET | コレクションメタデータ |
+| `/query` | POST | セマンティック検索 |
+
+**クエリ例:**
+
+```bash
+curl -X POST "http://localhost:8001/query" \
+  -H "Content-Type: application/json" \
+  -d '{"query": "賛成の理由は？", "n_results": 5}'
+```
+
+### CLIクエリ
+
+```bash
+pixi run python main.py query bill-of-lading "主な賛成意見は何ですか？"
 ```
 
 ### バッチ処理
@@ -72,12 +147,6 @@ vim config/batch_jobs.yaml
 
 # バッチ実行
 pixi run python main.py batch config/batch_jobs.yaml
-```
-
-### RAGクエリ
-
-```bash
-pixi run python main.py query ai-plan-test "主な賛成意見は何ですか？"
 ```
 
 ## LLMプロバイダー設定
@@ -124,9 +193,18 @@ outputs/{survey_slug}/
     └── metadata.json
 ```
 
-## CLIオプション
+## CLIコマンド一覧
 
-### `analyze` コマンド
+| コマンド | 説明 |
+|---------|------|
+| `list-surveys` | 利用可能なアンケート一覧 |
+| `analyze` | アンケート分析を実行 |
+| `batch` | バッチ処理を実行 |
+| `query` | RAGインデックスにクエリ |
+| `build-index` | RAGインデックスを構築 |
+| `serve-index` | ChromaDBサーバーを起動 (レガシー) |
+
+### `analyze` コマンドオプション
 
 | オプション | 短縮形 | 説明 |
 |-----------|-------|------|
@@ -157,10 +235,34 @@ survey_analysis_pipeline/
 │   ├── multi_llm.py       # Multi LLM
 │   └── persona_assembly.py # Persona Assembly
 ├── main.py                 # CLIエントリーポイント
+├── rag_server.py          # RAG検索サーバー
 └── pixi.toml              # 依存関係定義
 ```
+
+## 技術スタック
+
+| コンポーネント | 技術 |
+|--------------|------|
+| Python環境 | pixi, Python 3.12 |
+| LLM統合 | litellm (Ollama, Bedrock, OpenRouter) |
+| CLI | typer, rich |
+| 分析 | pandas, scikit-learn, hdbscan, umap-learn |
+| 埋め込み | sentence-transformers (multilingual-e5-base) |
+| ベクトルDB | ChromaDB |
+| 可視化 | matplotlib, plotly, wordcloud |
+| APIサーバー | FastAPI, uvicorn |
+
+## Next.js Viewerとの連携
+
+このパイプラインは `survey_report_viewer` と連携して動作します：
+
+1. **分析実行**: `pixi run python main.py analyze <slug>`
+2. **RAGサーバー起動**: `pixi run python rag_server.py <slug> --port 8001`
+3. **Viewer起動**: `cd ../survey_report_viewer && pnpm start`
+4. **ブラウザでアクセス**: 
+   - レポート: http://localhost:3000/reports/<slug>
+   - Q&A (RAGモード): http://localhost:3000/qa/<slug>?mode=rag
 
 ## ライセンス
 
 MIT
-
