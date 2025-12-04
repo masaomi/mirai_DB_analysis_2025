@@ -462,6 +462,217 @@ def query(
         ))
 
 
+@app.command("build-index")
+def build_index(
+    survey_slug: str = typer.Argument(..., help="Survey slug to build index for"),
+    output_dir: Optional[Path] = typer.Option(
+        None, "--output", "-o",
+        help="Output directory for index"
+    ),
+    include_raw_data: bool = typer.Option(
+        True, "--include-raw/--no-raw",
+        help="Include raw survey responses in index"
+    ),
+):
+    """Build RAG index for a survey (can be run independently).
+    
+    This command builds a ChromaDB vector index from:
+    - report.md (if exists)
+    - analysis_data.json (if exists)
+    - Raw survey responses from CSV (if --include-raw)
+    """
+    settings = get_settings()
+    
+    if output_dir is None:
+        output_dir = Path(settings.output_dir) / survey_slug
+    output_dir.mkdir(parents=True, exist_ok=True)
+    
+    console.print(Panel(
+        f"[bold blue]Building RAG Index: {survey_slug}[/bold blue]\n"
+        f"Include raw data: {'Yes' if include_raw_data else 'No'}",
+        title="RAG Index Builder",
+    ))
+    
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        console=console,
+    ) as progress:
+        
+        # Load existing analysis data if available
+        analysis_data = None
+        analysis_data_path = output_dir / "analysis_data.json"
+        if analysis_data_path.exists():
+            task = progress.add_task("[cyan]Loading analysis data...", total=None)
+            import json
+            with open(analysis_data_path, 'r', encoding='utf-8') as f:
+                analysis_data = json.load(f)
+            progress.update(task, completed=True)
+            console.print(f"  ✓ Loaded analysis data")
+        
+        # Load report if available
+        report_content = ""
+        report_path = output_dir / "report.md"
+        if report_path.exists():
+            task = progress.add_task("[cyan]Loading report...", total=None)
+            with open(report_path, 'r', encoding='utf-8') as f:
+                report_content = f.read()
+            progress.update(task, completed=True)
+            console.print(f"  ✓ Loaded report ({len(report_content)} chars)")
+        
+        # Load raw responses if requested
+        responses = []
+        if include_raw_data:
+            task = progress.add_task("[cyan]Extracting raw responses...", total=None)
+            extractor = ResponseExtractor(settings)
+            try:
+                extraction_result = extractor.extract_responses(survey_slug)
+                responses = extraction_result.responses
+                progress.update(task, completed=True)
+                console.print(f"  ✓ Extracted {len(responses)} raw responses")
+            except Exception as e:
+                progress.update(task, completed=True)
+                console.print(f"  [yellow]⚠ Could not load raw data: {e}[/yellow]")
+        
+        # Build index
+        task = progress.add_task("[cyan]Building vector index...", total=None)
+        index_builder = IndexBuilder(settings)
+        
+        # Prepare cluster summaries from analysis data
+        cluster_summaries = []
+        if analysis_data and 'cluster_details' in analysis_data:
+            cluster_summaries = [
+                {
+                    'cluster_id': c.get('cluster_id', 0),
+                    'cluster_label': c.get('label', ''),
+                    'group_assertion': f"クラスタ {c.get('label', '')} ({c.get('size', 0)}件)",
+                    'main_points': c.get('keywords', []),
+                    'response_count': c.get('size', 0),
+                }
+                for c in analysis_data['cluster_details']
+            ]
+        
+        index_path = index_builder.build_index(
+            survey_slug=survey_slug,
+            responses=responses,
+            report_content=report_content,
+            cluster_summaries=cluster_summaries,
+            output_dir=output_dir,
+        )
+        progress.update(task, completed=True)
+        
+        # Get index stats
+        metadata_path = index_path / "metadata.json"
+        if metadata_path.exists():
+            import json
+            with open(metadata_path, 'r', encoding='utf-8') as f:
+                metadata = json.load(f)
+            console.print(f"\n[bold green]✓ Index built successfully![/bold green]")
+            console.print(f"  Collection: {metadata.get('collection_name', 'unknown')}")
+            console.print(f"  Responses indexed: {metadata.get('response_count', 0)}")
+            console.print(f"  Clusters indexed: {metadata.get('cluster_count', 0)}")
+            console.print(f"  Path: {index_path}")
+
+
+@app.command("serve-index")
+def serve_index(
+    survey_slug: str = typer.Argument(..., help="Survey slug to serve index for"),
+    output_dir: Optional[Path] = typer.Option(
+        None, "--output", "-o",
+        help="Output directory containing index"
+    ),
+    port: int = typer.Option(
+        8000, "--port", "-p",
+        help="Port to serve ChromaDB on"
+    ),
+    host: str = typer.Option(
+        "localhost", "--host", "-h",
+        help="Host to bind to"
+    ),
+):
+    """Start ChromaDB server for RAG queries.
+    
+    This starts a ChromaDB HTTP server that can be queried from Next.js.
+    The server will serve the vector index for the specified survey.
+    
+    Example:
+        pixi run python main.py serve-index bill-of-lading --port 8000
+    
+    Then connect from Next.js with:
+        const client = new ChromaClient({ path: "http://localhost:8000" });
+    """
+    settings = get_settings()
+    
+    if output_dir is None:
+        output_dir = Path(settings.output_dir) / survey_slug
+    
+    index_dir = output_dir / "vector_index"
+    
+    if not index_dir.exists():
+        console.print(f"[red]Index not found: {index_dir}[/red]")
+        console.print("Run 'build-index' first to create the index.")
+        raise typer.Exit(1)
+    
+    # Check for metadata
+    metadata_path = index_dir / "metadata.json"
+    if not metadata_path.exists():
+        console.print(f"[red]Index metadata not found: {metadata_path}[/red]")
+        raise typer.Exit(1)
+    
+    import json
+    with open(metadata_path, 'r', encoding='utf-8') as f:
+        metadata = json.load(f)
+    
+    console.print(Panel(
+        f"[bold blue]Starting ChromaDB Server[/bold blue]\n"
+        f"Survey: {survey_slug}\n"
+        f"Collection: {metadata.get('collection_name', 'unknown')}\n"
+        f"Documents: {metadata.get('response_count', 0)} responses, {metadata.get('cluster_count', 0)} clusters\n"
+        f"URL: http://{host}:{port}",
+        title="RAG Server",
+    ))
+    
+    console.print(f"\n[yellow]Press Ctrl+C to stop the server[/yellow]\n")
+    
+    # Start ChromaDB server
+    import subprocess
+    import shutil
+    
+    try:
+        # Find chroma executable
+        chroma_path = shutil.which("chroma")
+        if not chroma_path:
+            # Try in pixi environment
+            import sys
+            env_bin = Path(sys.executable).parent
+            chroma_path = env_bin / "chroma"
+            if not chroma_path.exists():
+                console.print("[red]chroma CLI not found[/red]")
+                console.print("Install with: pip install chromadb")
+                raise typer.Exit(1)
+        
+        # Use chroma CLI to start server
+        cmd = [
+            str(chroma_path),
+            "run",
+            "--path", str(index_dir),
+            "--host", host,
+            "--port", str(port),
+        ]
+        
+        console.print(f"[dim]Running: {' '.join(cmd)}[/dim]\n")
+        
+        process = subprocess.run(cmd)
+        
+    except KeyboardInterrupt:
+        console.print("\n[yellow]Server stopped[/yellow]")
+    except Exception as e:
+        console.print(f"[red]Error starting server: {e}[/red]")
+        console.print("\n[yellow]Alternative: You can also run ChromaDB server directly:[/yellow]")
+        console.print(f"  chroma run --path {index_dir} --host {host} --port {port}")
+        raise typer.Exit(1)
+
+
 if __name__ == "__main__":
     app()
 
