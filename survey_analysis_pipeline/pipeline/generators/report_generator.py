@@ -123,6 +123,68 @@ REPORT_TEMPLATE = """# {{ survey_title }} - 分析レポート
 
 ---
 
+{% if ronten_summaries %}
+## 📋 論点別分析
+
+法制審議会で議論されている主要論点ごとに、インタビュー結果を整理しました。
+
+{% for ronten in ronten_summaries %}
+### {{ loop.index }}. {{ ronten.ronten_title }} (関連意見: {{ ronten.opinion_count }}件)
+
+{{ ronten.summary }}
+
+{% if ronten.supporting_points %}
+**サポート意見**:
+{% for point in ronten.supporting_points -%}
+- {{ point }}
+{% endfor %}
+{% endif %}
+
+{% if ronten.concern_points %}
+**懸念点**:
+{% for point in ronten.concern_points -%}
+- {{ point }}
+{% endfor %}
+{% endif %}
+
+{% if ronten.expert_points %}
+**専門家・当事者の指摘**:
+{% for point in ronten.expert_points -%}
+- 💡 {{ point }}
+{% endfor %}
+{% endif %}
+
+{% if ronten.representative_quotes %}
+**代表的な意見**:
+{% for quote in ronten.representative_quotes[:2] %}
+> "{{ quote[:200] }}{% if quote|length > 200 %}...{% endif %}"
+
+{% endfor %}
+{% endif %}
+
+{% endfor %}
+
+{% if novel_insights %}
+### ★ 新規論点（審議会で議論されていない視点）
+
+以下は法制審議会の論点には含まれていない、新しい視点や指摘です：
+
+{% for insight in novel_insights %}
+#### ★ {{ insight.summary }}
+
+> {{ insight.content[:300] }}{% if insight.content|length > 300 %}...{% endif %}
+
+**種別**: {{ insight.insight_type }}
+{% if insight.session_id %}
+📎 [元のインタビュー](https://depth-interview-ai.vercel.app/report/{{ insight.session_id }})
+{% endif %}
+
+{% endfor %}
+{% endif %}
+
+---
+{% endif %}
+
 ## 意見クラスタ別分析
 
 {% for cluster in cluster_summaries %}
@@ -365,6 +427,9 @@ class ReportGenerator:
             # i-1 Grand Prix: Bill-focused insights
             "supporting_insights": summary.supporting_insights,
             "concerns": summary.concerns,
+            # Ronten-based analysis
+            "ronten_summaries": [rs.to_dict() for rs in summary.ronten_summaries],
+            "novel_insights": [ni.to_dict() for ni in summary.novel_insights],
             "expert_insights": summary.expert_insights,
             # Multi-LLM consensus & filter stats
             "multi_llm_consensus": data.multi_llm_consensus,

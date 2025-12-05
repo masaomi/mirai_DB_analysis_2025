@@ -25,8 +25,9 @@ from pipeline.filters.cluster_filter import ClusterBasedFilter
 from pipeline.analyzers.stance_detector import StanceDetector
 from pipeline.analyzers.topic_clusterer import TopicClusterer
 from pipeline.analyzers.minority_detector import MinorityDetector
+from pipeline.analyzers.ronten_matcher import RontenMatcher
 from pipeline.summarizers.cluster_summarizer import ClusterSummarizer
-from pipeline.summarizers.overall_summarizer import OverallSummarizer
+from pipeline.summarizers.overall_summarizer import OverallSummarizer, RontenSummary, NovelInsight
 from pipeline.generators.report_generator import ReportGenerator, ReportData
 from pipeline.generators.chart_generator import ChartGenerator
 from pipeline.generators.index_builder import IndexBuilder
@@ -294,6 +295,116 @@ async def _run_pipeline(
             cluster_summaries = await cluster_summarizer.summarize_all_clusters(clusters)
             progress.update(task, completed=True)
             
+            # Ronten-based analysis
+            ronten_summaries = []
+            novel_insights = []
+            ronten_items = ronten_loader.get_ronten_items(survey_slug)
+            
+            if ronten_items:
+                task = progress.add_task("[cyan]Matching opinions to legislative discussion points...", total=None)
+                ronten_matcher = RontenMatcher(settings, llm_client)
+                
+                # Prepare opinions from cluster summaries for ronten matching
+                opinions_for_matching = []
+                for cs in cluster_summaries:
+                    # Use cluster assertion and main points as representative opinion
+                    content = f"{cs.group_assertion}. {'. '.join(cs.main_points)}"
+                    if cs.representative_quote:
+                        content += f" 代表的意見: {cs.representative_quote}"
+                    opinions_for_matching.append({
+                        "content": content,
+                        "cluster_id": cs.cluster_id,
+                        "cluster_label": cs.cluster_label,
+                        "response_count": cs.response_count,
+                        "session_ids": getattr(cs, 'representative_session_ids', []),
+                    })
+                
+                # Add minority opinions
+                for mo in minorities:
+                    opinions_for_matching.append({
+                        "content": mo.content,
+                        "session_id": mo.session_id,
+                        "is_minority": True,
+                    })
+                
+                # Match to ronten
+                ronten_analyses, novel_opinions = await ronten_matcher.analyze_by_ronten(
+                    opinions_for_matching,
+                    survey_slug,
+                )
+                
+                progress.update(task, completed=True)
+                console.print(f"  ✓ Matched opinions to {len(ronten_analyses)} discussion points")
+                if novel_opinions:
+                    console.print(f"  ✓ Found {len(novel_opinions)} novel insights not in legislative discussion")
+                
+                # Generate ronten summaries using LLM
+                task = progress.add_task("[cyan]Generating ronten-based summaries...", total=None)
+                
+                for analysis in ronten_analyses:
+                    # Collect all opinions for this ronten
+                    all_opinions = (
+                        analysis.supporting_opinions +
+                        analysis.concerns +
+                        analysis.expert_opinions +
+                        analysis.general_opinions
+                    )
+                    
+                    # Generate summary for this ronten
+                    if all_opinions:
+                        opinions_text = "\n".join(
+                            f"- {op.get('content', '')[:200]}"
+                            for op in all_opinions[:10]
+                        )
+                        
+                        summary_prompt = f"""以下は「{analysis.ronten_title}」（法制審議会論点）に関連する意見です。
+この論点について、意見を簡潔に要約してください（3-4文）。
+
+## 関連意見
+{opinions_text}
+
+## 指示
+- サポート意見、懸念、専門家の指摘を区別してください
+- 具体的な内容を優先してください
+- 100字程度で要約してください
+"""
+                        try:
+                            summary_response = await llm_client.generate(summary_prompt)
+                            summary_text = summary_response[:300]
+                        except Exception:
+                            summary_text = f"{analysis.opinion_count}件の関連意見があります。"
+                        
+                        ronten_summaries.append(RontenSummary(
+                            ronten_id=analysis.ronten_id,
+                            ronten_title=analysis.ronten_title,
+                            opinion_count=analysis.opinion_count,
+                            summary=summary_text,
+                            supporting_points=[
+                                op.get("content", "")[:150] for op in analysis.supporting_opinions[:3]
+                            ],
+                            concern_points=[
+                                op.get("content", "")[:150] for op in analysis.concerns[:3]
+                            ],
+                            expert_points=[
+                                op.get("content", "")[:150] for op in analysis.expert_opinions[:3]
+                            ],
+                            representative_quotes=[
+                                op.get("content", "")[:200] for op in all_opinions[:2]
+                            ],
+                        ))
+                
+                # Create novel insights
+                for op in novel_opinions[:5]:  # Limit to top 5
+                    match_data = op.get("ronten_match", {})
+                    novel_insights.append(NovelInsight(
+                        content=op.get("content", ""),
+                        session_id=op.get("session_id", ""),
+                        insight_type=match_data.get("insight_type", "general"),
+                        summary=match_data.get("summary", "新規論点"),
+                    ))
+                
+                progress.update(task, completed=True)
+            
             # Generate overall summary
             overall_summarizer = OverallSummarizer(settings, llm_client)
             
@@ -304,12 +415,12 @@ async def _run_pipeline(
                 
                 overall_summary, multi_llm_result = await overall_summarizer.generate_summary_multi_llm(
                     orchestrator=orchestrator,
-                    survey_title=extraction_result.survey_title,
-                    total_responses=extraction_result.response_count,
-                    date_range=extraction_result.date_range,
-                    stance_distribution=stance_distribution,
-                    cluster_summaries=cluster_summaries,
-                    minority_opinions=minorities,
+                survey_title=extraction_result.survey_title,
+                total_responses=extraction_result.response_count,
+                date_range=extraction_result.date_range,
+                stance_distribution=stance_distribution,
+                cluster_summaries=cluster_summaries,
+                minority_opinions=minorities,
                     ronten_context=ronten_context,
                 )
                 
@@ -323,6 +434,10 @@ async def _run_pipeline(
                 progress.update(task, completed=True)
                 console.print(f"  ✓ Multi-LLM agreement score: {multi_llm_result.agreement_score:.2f}")
                 console.print(f"  ✓ Saved Multi-LLM logs to {output_dir}/multi_llm/")
+                
+                # Add ronten analysis to overall summary
+                overall_summary.ronten_summaries = ronten_summaries
+                overall_summary.novel_insights = novel_insights
             else:
                 # Use single LLM for overall summary
                 task = progress.add_task("[cyan]Generating overall summary...", total=None)
@@ -336,6 +451,10 @@ async def _run_pipeline(
                     ronten_context=ronten_context,
                 )
                 progress.update(task, completed=True)
+                
+                # Add ronten analysis to overall summary
+                overall_summary.ronten_summaries = ronten_summaries
+                overall_summary.novel_insights = novel_insights
             
             # Persona analysis
             persona_result = None

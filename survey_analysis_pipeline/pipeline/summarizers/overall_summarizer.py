@@ -77,6 +77,48 @@ JSON形式で出力してください：
 
 
 @dataclass
+class RontenSummary:
+    """Summary for a single ronten (discussion point)."""
+    ronten_id: str
+    ronten_title: str
+    opinion_count: int
+    summary: str  # LLM-generated summary for this ronten
+    supporting_points: List[str] = field(default_factory=list)
+    concern_points: List[str] = field(default_factory=list)
+    expert_points: List[str] = field(default_factory=list)
+    representative_quotes: List[str] = field(default_factory=list)
+    
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "ronten_id": self.ronten_id,
+            "ronten_title": self.ronten_title,
+            "opinion_count": self.opinion_count,
+            "summary": self.summary,
+            "supporting_points": self.supporting_points,
+            "concern_points": self.concern_points,
+            "expert_points": self.expert_points,
+            "representative_quotes": self.representative_quotes,
+        }
+
+
+@dataclass
+class NovelInsight:
+    """A novel insight not covered by existing ronten."""
+    content: str
+    session_id: str
+    insight_type: str  # "supporting", "concern", "expert", "general"
+    summary: str
+    
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "content": self.content,
+            "session_id": self.session_id,
+            "insight_type": self.insight_type,
+            "summary": self.summary,
+        }
+
+
+@dataclass
 class OverallSummary:
     """Overall summary of survey analysis."""
     survey_title: str
@@ -95,6 +137,10 @@ class OverallSummary:
     supporting_insights: List[Dict[str, str]] = field(default_factory=list)  # {"content": ..., "reason": ..., "related_ronten": ...}
     concerns: List[Dict[str, str]] = field(default_factory=list)  # {"content": ..., "risk": ..., "related_ronten": ...}
     expert_insights: List[Dict[str, str]] = field(default_factory=list)  # {"content": ..., "expertise": ..., "related_ronten": ...}
+    
+    # Ronten-based analysis
+    ronten_summaries: List[RontenSummary] = field(default_factory=list)
+    novel_insights: List[NovelInsight] = field(default_factory=list)
     
     # Components
     stance_distribution: Dict[str, Dict[str, Any]] = field(default_factory=dict)
@@ -116,6 +162,8 @@ class OverallSummary:
             "supporting_insights": self.supporting_insights,
             "concerns": self.concerns,
             "expert_insights": self.expert_insights,
+            "ronten_summaries": [rs.to_dict() for rs in self.ronten_summaries],
+            "novel_insights": [ni.to_dict() for ni in self.novel_insights],
             "stance_distribution": self.stance_distribution,
             "cluster_summaries": [cs.to_dict() for cs in self.cluster_summaries],
             "minority_opinions": [mo.to_dict() for mo in self.minority_opinions],
