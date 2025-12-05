@@ -87,6 +87,7 @@ class RontenSummary:
     concern_points: List[str] = field(default_factory=list)
     expert_points: List[str] = field(default_factory=list)
     representative_quotes: List[str] = field(default_factory=list)
+    representative_session_ids: List[str] = field(default_factory=list)  # Session IDs for reference
     
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -98,6 +99,7 @@ class RontenSummary:
             "concern_points": self.concern_points,
             "expert_points": self.expert_points,
             "representative_quotes": self.representative_quotes,
+            "representative_session_ids": self.representative_session_ids,
         }
 
 

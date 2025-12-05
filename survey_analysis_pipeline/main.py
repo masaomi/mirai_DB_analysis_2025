@@ -374,6 +374,18 @@ async def _run_pipeline(
                         except Exception:
                             summary_text = f"{analysis.opinion_count}件の関連意見があります。"
                         
+                        # Collect session IDs from opinions
+                        session_ids = []
+                        for op in all_opinions:
+                            # From cluster opinions
+                            if op.get("session_ids"):
+                                session_ids.extend(op.get("session_ids", []))
+                            # From minority opinions
+                            if op.get("session_id"):
+                                session_ids.append(op.get("session_id"))
+                        # Deduplicate and limit
+                        unique_session_ids = list(dict.fromkeys(session_ids))[:5]
+                        
                         ronten_summaries.append(RontenSummary(
                             ronten_id=analysis.ronten_id,
                             ronten_title=analysis.ronten_title,
@@ -391,6 +403,7 @@ async def _run_pipeline(
                             representative_quotes=[
                                 op.get("content", "")[:200] for op in all_opinions[:2]
                             ],
+                            representative_session_ids=unique_session_ids,
                         ))
                 
                 # Create novel insights

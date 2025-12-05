@@ -162,6 +162,13 @@ REPORT_TEMPLATE = """# {{ survey_title }} - 分析レポート
 {% endfor %}
 {% endif %}
 
+{% if ronten.representative_session_ids %}
+**参照セッション**:
+{% for session_id in ronten.representative_session_ids[:5] %}
+- [セッション {{ session_id[:8] }}...](https://depth-interview-ai.vercel.app/report/{{ session_id }})
+{% endfor %}
+{% endif %}
+
 {% endfor %}
 
 {% if novel_insights %}
