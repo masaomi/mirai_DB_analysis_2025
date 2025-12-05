@@ -109,6 +109,20 @@ class Settings(BaseSettings):
         description="Enable LLM-based relevance check for minority opinions"
     )
     
+    # Response Relevance Filter
+    relevance_filter_enabled: bool = Field(
+        default=True,
+        description="Enable initial response relevance filtering"
+    )
+    relevance_min_score: float = Field(
+        default=0.5,
+        description="Minimum score for relevant responses (0-1)"
+    )
+    relevance_batch_size: int = Field(
+        default=10,
+        description="Batch size for relevance filtering"
+    )
+    
     # Summarization Settings
     chunk_size: int = Field(
         default=30,

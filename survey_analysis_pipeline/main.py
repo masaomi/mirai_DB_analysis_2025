@@ -20,6 +20,7 @@ from config.settings import Settings, get_settings, LLMProvider
 from core.llm_client import LLMClient
 from pipeline.extractors.data_loader import SurveyDataLoader
 from pipeline.extractors.response_extractor import ResponseExtractor
+from pipeline.filters.relevance_filter import RelevanceFilter
 from pipeline.analyzers.stance_detector import StanceDetector
 from pipeline.analyzers.topic_clusterer import TopicClusterer
 from pipeline.analyzers.minority_detector import MinorityDetector
@@ -176,16 +177,43 @@ async def _run_pipeline(
         
         console.print(f"  ✓ Extracted {extraction_result.response_count} responses")
         
+        # Phase 1.5: Filter responses by relevance
+        filtered_responses = extraction_result.responses
+        relevance_results = []
+        
+        if settings.relevance_filter_enabled:
+            task = progress.add_task("[cyan]Filtering responses by relevance...", total=None)
+            llm_client = LLMClient(settings)
+            relevance_filter = RelevanceFilter(settings, llm_client)
+            
+            filtered_responses, relevance_results = await relevance_filter.filter_responses(
+                extraction_result.responses,
+                extraction_result.survey_title,
+            )
+            progress.update(task, completed=True)
+            console.print(f"  ✓ Filtered: {len(extraction_result.responses)} → {len(filtered_responses)} relevant responses")
+            
+            # Save filter results for debugging
+            import json
+            filter_log_path = output_dir / "relevance_filter_log.json"
+            with open(filter_log_path, 'w', encoding='utf-8') as f:
+                json.dump(
+                    [r.to_dict() for r in relevance_results],
+                    f,
+                    ensure_ascii=False,
+                    indent=2
+                )
+        
         # Phase 2: Analyze
         task = progress.add_task("[cyan]Detecting stances...", total=None)
         stance_detector = StanceDetector()
-        stance_results = stance_detector.analyze_responses(extraction_result.responses)
+        stance_results = stance_detector.analyze_responses(filtered_responses)
         stance_distribution = stance_detector.get_stance_distribution(stance_results)
         progress.update(task, completed=True)
         
         task = progress.add_task("[cyan]Clustering responses...", total=None)
         clusterer = TopicClusterer(settings)
-        clusters_all = clusterer.cluster_responses(extraction_result.responses)
+        clusters_all = clusterer.cluster_responses(filtered_responses)
         # Filter clusters by minimum size for report
         clusters = [c for c in clusters_all if c.size >= settings.min_cluster_size_for_report]
         progress.update(task, completed=True)
@@ -194,7 +222,7 @@ async def _run_pipeline(
         
         task = progress.add_task("[cyan]Detecting minority opinions...", total=None)
         minority_detector = MinorityDetector(settings)
-        minorities = minority_detector.detect_minorities(extraction_result.responses)
+        minorities = minority_detector.detect_minorities(filtered_responses)
         progress.update(task, completed=True)
         
         console.print(f"  ✓ Found {len(minorities)} minority opinions")
@@ -342,7 +370,7 @@ async def _run_pipeline(
                 'stance_distribution': stance_distribution,
                 'cluster_summaries': [cs.to_dict() for cs in cluster_summaries] if cluster_summaries else [],
                 'cluster_details': cluster_details,
-                'response_texts': [r.content for r in extraction_result.responses],
+                'response_texts': [r.content for r in filtered_responses],
             }
             
             chart_outputs = chart_generator.generate_all_charts(
