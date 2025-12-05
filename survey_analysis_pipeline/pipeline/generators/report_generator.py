@@ -25,6 +25,32 @@ REPORT_TEMPLATE = """# {{ survey_title }} - 分析レポート
 
 ---
 
+{% if filter_stats %}
+## 📜 フィルタリング統計
+
+クラスタベースの関連性フィルタリング（効率的なLLM判定）の統計です。
+
+- **全回答数**: {{ filter_stats.total_responses }}
+- **全クラスタ数**: {{ filter_stats.total_clusters }}
+- **分析対象回答数**: {{ filter_stats.final_responses }}
+
+### クラスタ別フィルタ結果
+
+| フィルタ方法 | クラスタ数 | 説明 |
+|------------|----------|------|
+| 自動含める（大規模） | {{ filter_stats.auto_included_clusters }} | ≥10件のクラスタは自動的に関連ありと判定 |
+| LLMチェック（中規模） | {{ filter_stats.llm_checked_clusters }} | 3-9件のクラスタは代表サンプルをLLM判定 |
+| 除外（小規模） | {{ filter_stats.excluded_clusters }} | <3件のクラスタは除外（マイノリティで再評価） |
+| ノイズ | {{ filter_stats.noise_responses }}件 | クラスタに属さない回答 |
+
+### 効率性
+
+- **LLMコール数**: {{ filter_stats.llm_calls_made }}回
+- **節約したLLMコール**: {{ filter_stats.llm_calls_saved }}回（全件チェック比）
+
+---
+{% endif %}
+
 {% if supporting_insights %}
 ## ✅ 法案をサポートする知見
 
@@ -34,6 +60,9 @@ REPORT_TEMPLATE = """# {{ survey_title }} - 分析レポート
 ### {{ loop.index }}. {{ insight.content }}
 
 **根拠・背景**: {{ insight.reason }}
+{% if insight.related_ronten %}
+**関連する論点**: {{ insight.related_ronten }}
+{% endif %}
 
 {% endfor %}
 {% endif %}
@@ -49,6 +78,9 @@ REPORT_TEMPLATE = """# {{ survey_title }} - 分析レポート
 ### {{ loop.index }}. {{ concern.content }}
 
 **想定されるリスク**: {{ concern.risk }}
+{% if concern.related_ronten %}
+**関連する論点**: {{ concern.related_ronten }}
+{% endif %}
 
 {% endfor %}
 {% endif %}
@@ -64,6 +96,9 @@ REPORT_TEMPLATE = """# {{ survey_title }} - 分析レポート
 ### {{ loop.index }}. {{ insight.content }}
 
 **専門分野・経験**: {{ insight.expertise }}
+{% if insight.related_ronten %}
+**関連する論点**: {{ insight.related_ronten }}
+{% endif %}
 
 {% endfor %}
 {% endif %}
@@ -183,8 +218,15 @@ REPORT_TEMPLATE = """# {{ survey_title }} - 分析レポート
 
 複数のLLMモデルによる分析結果を統合しました。
 
-**合意スコア**: {{ "%.1f"|format(multi_llm_consensus.agreement_score * 100) }}%
-**議論ラウンド数**: {{ multi_llm_consensus.discussion_rounds | length }}
+### スコア詳細
+
+| 指標 | 値 | 説明 |
+|------|-----|------|
+| **合意スコア** | {{ "%.1f"|format(multi_llm_consensus.agreement_score * 100) }}% | `合意点数 / (合意点数 + 対立点数)` |
+{% if multi_llm_consensus.discussion_rounds %}
+| **相互評価平均スコア** | {{ "%.1f"|format(multi_llm_consensus.discussion_rounds[-1].consensus_score * 100) }}% | 各LLMが他のLLM回答を評価した平均（0-10点を正規化） |
+{% endif %}
+| **議論ラウンド数** | {{ multi_llm_consensus.discussion_rounds | length }} | 合意形成までの反復回数 |
 
 ### 統合された知見
 
@@ -270,6 +312,7 @@ class ReportData:
     overall_summary: OverallSummary
     persona_analysis: Optional[Dict[str, Any]] = None
     multi_llm_consensus: Optional[Dict[str, Any]] = None
+    filter_stats: Optional[Dict[str, Any]] = None  # Added filter stats
 
 
 class ReportGenerator:
@@ -298,6 +341,13 @@ class ReportGenerator:
         """
         summary = data.overall_summary
         
+        # Sort cluster summaries by response_count (descending)
+        sorted_clusters = sorted(
+            summary.cluster_summaries,
+            key=lambda cs: cs.response_count,
+            reverse=True
+        )
+        
         context = {
             "survey_title": summary.survey_title,
             "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
@@ -306,7 +356,7 @@ class ReportGenerator:
             "executive_summary": summary.executive_summary,
             "stance_distribution": summary.stance_distribution,
             "key_findings": summary.key_findings,
-            "cluster_summaries": [cs.to_dict() for cs in summary.cluster_summaries],
+            "cluster_summaries": [cs.to_dict() for cs in sorted_clusters],
             "consensus_points": summary.consensus_points,
             "disagreement_points": summary.disagreement_points,
             "minority_opinions": [mo.to_dict() for mo in summary.minority_opinions],
@@ -316,9 +366,10 @@ class ReportGenerator:
             "supporting_insights": summary.supporting_insights,
             "concerns": summary.concerns,
             "expert_insights": summary.expert_insights,
-            # Multi-LLM consensus
+            # Multi-LLM consensus & filter stats
             "multi_llm_consensus": data.multi_llm_consensus,
             "persona_analysis": data.persona_analysis,
+            "filter_stats": data.filter_stats,
         }
         
         return self.template.render(**context)
@@ -459,4 +510,3 @@ class ReportGenerator:
             outputs['html'] = html_path
         
         return outputs
-

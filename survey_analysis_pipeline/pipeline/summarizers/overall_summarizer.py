@@ -16,7 +16,10 @@ if TYPE_CHECKING:
 
 
 OVERALL_SUMMARY_PROMPT = """あなたは法案検討を支援するアンケート分析の専門家です。
-以下のインタビュー分析結果から、法案を検討する際に参考になる知見を抽出し、レポートを作成してください。
+以下のインタビュー分析結果と法制審議会の論点（コンテキスト）を踏まえて、法案を検討する際に参考になる知見を抽出し、レポートを作成してください。
+
+## 法制審議会での主な論点（コンテキスト）
+{ronten_context}
 
 ## インタビュー情報
 - テーマ: {survey_title}
@@ -34,13 +37,15 @@ OVERALL_SUMMARY_PROMPT = """あなたは法案検討を支援するアンケー�
 
 ## 指示
 法案検討に役立つ知見を抽出し、以下の形式で分析を作成してください。
-特に、専門知識・実務経験・当事者経験に基づく具体的な意見を重視してください。
+特に、法制審議会の論点（電子裏書、強制執行、システム障害時の対応など）に関連する、専門知識・実務経験・当事者経験に基づく具体的な意見を重視してください。
 
 1. **エグゼクティブサマリー**: 意思決定者向けの簡潔な要約（200字以内）
 2. **法案をサポートする知見**: 法案の内容を根拠に基づいてサポートする意見
    - 例: 「実務においてこういう課題がある」「この法案が可決するとこういう観点で嬉しい」
+   - コンテキストのどの論点に関連するかを明記してください。
 3. **法案への懸念点**: 法案の内容に関する懸念
    - 例: 「これが実現するとこういう不都合・リスクがある」「運用コストが高い割にインパクトが小さい」
+   - コンテキストのどの論点に関連するかを明記してください。
 4. **専門家・当事者からの重要な指摘**: 深い専門知識や実務経験に基づく意見
 5. **合意点**: 回答者間で共通している意見
 6. **対立点**: 意見が分かれている論点
@@ -51,16 +56,16 @@ JSON形式で出力してください：
 {{
     "executive_summary": "エグゼクティブサマリー",
     "supporting_insights": [
-        {{"content": "サポートする知見1", "reason": "根拠や背景"}},
-        {{"content": "サポートする知見2", "reason": "根拠や背景"}}
+        {{"content": "サポートする知見1", "reason": "根拠や背景", "related_ronten": "関連論点（例：電子裏書）"}},
+        {{"content": "サポートする知見2", "reason": "根拠や背景", "related_ronten": "関連論点（例：B案）"}}
     ],
     "concerns": [
-        {{"content": "懸念点1", "risk": "想定されるリスク"}},
-        {{"content": "懸念点2", "risk": "想定されるリスク"}}
+        {{"content": "懸念点1", "risk": "想定されるリスク", "related_ronten": "関連論点（例：強制執行）"}},
+        {{"content": "懸念点2", "risk": "想定されるリスク", "related_ronten": "関連論点"}}
     ],
     "expert_insights": [
-        {{"content": "専門家の指摘1", "expertise": "専門分野や経験"}},
-        {{"content": "専門家の指摘2", "expertise": "専門分野や経験"}}
+        {{"content": "専門家の指摘1", "expertise": "専門分野や経験", "related_ronten": "関連論点"}},
+        {{"content": "専門家の指摘2", "expertise": "専門分野や経験", "related_ronten": "関連論点"}}
     ],
     "key_findings": ["発見1", "発見2", ...],
     "consensus_points": ["合意点1", "合意点2", ...],
@@ -87,9 +92,9 @@ class OverallSummary:
     caveats: List[str]
     
     # i-1 Grand Prix: Bill-focused insights
-    supporting_insights: List[Dict[str, str]] = field(default_factory=list)  # {"content": ..., "reason": ...}
-    concerns: List[Dict[str, str]] = field(default_factory=list)  # {"content": ..., "risk": ...}
-    expert_insights: List[Dict[str, str]] = field(default_factory=list)  # {"content": ..., "expertise": ...}
+    supporting_insights: List[Dict[str, str]] = field(default_factory=list)  # {"content": ..., "reason": ..., "related_ronten": ...}
+    concerns: List[Dict[str, str]] = field(default_factory=list)  # {"content": ..., "risk": ..., "related_ronten": ...}
+    expert_insights: List[Dict[str, str]] = field(default_factory=list)  # {"content": ..., "expertise": ..., "related_ronten": ...}
     
     # Components
     stance_distribution: Dict[str, Dict[str, Any]] = field(default_factory=dict)
@@ -142,6 +147,7 @@ class OverallSummarizer:
         stance_distribution: Dict[str, Dict[str, Any]],
         cluster_summaries: List[ClusterSummary],
         minority_opinions: List[MinorityOpinion],
+        ronten_context: str = "",
     ) -> OverallSummary:
         """Generate overall summary from analysis components.
         
@@ -152,6 +158,7 @@ class OverallSummarizer:
             stance_distribution: Stance distribution data
             cluster_summaries: List of cluster summaries
             minority_opinions: List of minority opinions
+            ronten_context: Context string regarding legal issues (ronten)
             
         Returns:
             OverallSummary object
@@ -179,6 +186,9 @@ class OverallSummarizer:
         ) if minority_opinions else "特になし"
         
         # Build prompt
+        # Truncate ronten context if too long
+        context_str = ronten_context[:3000] if ronten_context else "（特になし）"
+        
         prompt = OVERALL_SUMMARY_PROMPT.format(
             survey_title=survey_title,
             total_responses=total_responses,
@@ -186,6 +196,7 @@ class OverallSummarizer:
             stance_distribution=stance_text,
             cluster_summaries=clusters_text,
             minority_opinions=minorities_text,
+            ronten_context=context_str,
         )
         
         # Call LLM
@@ -266,6 +277,7 @@ class OverallSummarizer:
         stance_distribution: Dict[str, Dict[str, Any]],
         cluster_summaries: List[ClusterSummary],
         minority_opinions: List[MinorityOpinion],
+        ronten_context: str = "",
     ) -> tuple["OverallSummary", "ConsensusResult"]:
         """Generate overall summary using Multi-LLM consensus.
         
@@ -277,6 +289,7 @@ class OverallSummarizer:
             stance_distribution: Stance distribution data
             cluster_summaries: List of cluster summaries
             minority_opinions: List of minority opinions
+            ronten_context: Context string regarding legal issues (ronten)
             
         Returns:
             Tuple of (OverallSummary, ConsensusResult)
@@ -305,6 +318,9 @@ class OverallSummarizer:
         ) if minority_opinions else "特になし"
         
         # Build prompt
+        # Truncate ronten context if too long
+        context_str = ronten_context[:3000] if ronten_context else "（特になし）"
+        
         prompt = OVERALL_SUMMARY_PROMPT.format(
             survey_title=survey_title,
             total_responses=total_responses,
@@ -312,19 +328,21 @@ class OverallSummarizer:
             stance_distribution=stance_text,
             cluster_summaries=clusters_text,
             minority_opinions=minorities_text,
+            ronten_context=context_str,
         )
         
-        # Add instruction to include references
+        # Add instruction to include references and consider context
         prompt += """
-
-重要: 分析結果には、可能な限り根拠となるセッションIDやクラスタIDを含めてください。
-例: 「セキュリティへの懸念が多い（クラスタ3、セッションabc123参照）」
-"""
+        
+        重要: 
+        1. 分析結果には、可能な限り根拠となるセッションIDやクラスタIDを含めてください。
+        2. 法制審議会の論点コンテキストとの関連性を必ず明記してください（特にsupporting/concerns/expertセクション）。
+        """
         
         # Use Multi-LLM consensus
         consensus_result = await orchestrator.reach_consensus_iterative(
             prompt,
-            system_prompt="あなたは法案分析の専門家です。多角的な視点から法案の影響を分析し、建設的な提言を行ってください。"
+            system_prompt="あなたは法案分析の専門家です。多角的な視点から法案の影響を分析し、建設的な提言を行ってください。法制審議会の議論状況を踏まえた深い分析を求めます。"
         )
         
         # Parse consensus content

@@ -20,7 +20,8 @@ from config.settings import Settings, get_settings, LLMProvider
 from core.llm_client import LLMClient
 from pipeline.extractors.data_loader import SurveyDataLoader
 from pipeline.extractors.response_extractor import ResponseExtractor
-from pipeline.filters.relevance_filter import RelevanceFilter
+from pipeline.extractors.ronten_loader import RontenLoader
+from pipeline.filters.cluster_filter import ClusterBasedFilter
 from pipeline.analyzers.stance_detector import StanceDetector
 from pipeline.analyzers.topic_clusterer import TopicClusterer
 from pipeline.analyzers.minority_detector import MinorityDetector
@@ -177,52 +178,93 @@ async def _run_pipeline(
         
         console.print(f"  ✓ Extracted {extraction_result.response_count} responses")
         
-        # Phase 1.5: Filter responses by relevance
-        filtered_responses = extraction_result.responses
-        relevance_results = []
+        # Phase 1.2: Load Ronten Context (if available)
+        ronten_loader = RontenLoader(settings)
+        ronten_context = ronten_loader.load_ronten_content(survey_slug)
+        if ronten_context:
+            console.print(f"  ✓ Loaded ronten context ({len(ronten_context)} chars)")
+        else:
+            console.print(f"  - No specific ronten context found for {survey_slug}")
+        
+        # Phase 2: Cluster first (embedding-based, no LLM needed)
+        task = progress.add_task("[cyan]Clustering responses...", total=None)
+        clusterer = TopicClusterer(settings)
+        clusters_all = clusterer.cluster_responses(extraction_result.responses)
+        progress.update(task, completed=True)
+        
+        console.print(f"  ✓ Found {len(clusters_all)} clusters")
+        
+        # Phase 2.5: Filter clusters (much fewer LLM calls than per-response)
+        filter_stats = None
+        filter_results = []
         
         if settings.relevance_filter_enabled:
-            task = progress.add_task("[cyan]Filtering responses by relevance...", total=None)
+            task = progress.add_task("[cyan]Filtering clusters by relevance...", total=None)
             llm_client = LLMClient(settings)
-            relevance_filter = RelevanceFilter(settings, llm_client)
+            cluster_filter = ClusterBasedFilter(settings, llm_client)
             
-            filtered_responses, relevance_results = await relevance_filter.filter_responses(
-                extraction_result.responses,
+            clusters, filter_results, filter_stats = await cluster_filter.filter_clusters(
+                clusters_all,
                 extraction_result.survey_title,
+                ronten_context=ronten_context,
             )
             progress.update(task, completed=True)
-            console.print(f"  ✓ Filtered: {len(extraction_result.responses)} → {len(filtered_responses)} relevant responses")
             
-            # Save filter results for debugging
+            # Display stats
+            console.print(Panel(
+                f"[bold]Cluster Filter Stats[/bold]\n"
+                f"Total Clusters: {filter_stats.total_clusters}\n"
+                f"Auto-included (≥{settings.min_cluster_size_for_report}): {filter_stats.auto_included_clusters}\n"
+                f"LLM-checked: {filter_stats.llm_checked_clusters}\n"
+                f"Excluded: {filter_stats.excluded_clusters}\n"
+                f"Noise responses: {filter_stats.noise_responses}\n\n"
+                f"[bold]Efficiency:[/bold]\n"
+                f"LLM calls made: {filter_stats.llm_calls_made}\n"
+                f"LLM calls saved: {filter_stats.llm_calls_saved} (vs per-response)\n"
+                f"Final responses: {filter_stats.final_responses} / {filter_stats.total_responses}",
+                title="Cluster-Based Filter",
+                border_style="yellow"
+            ))
+            
+            # Save filter results
             import json
-            filter_log_path = output_dir / "relevance_filter_log.json"
+            filter_log_path = output_dir / "cluster_filter_log.json"
             with open(filter_log_path, 'w', encoding='utf-8') as f:
                 json.dump(
-                    [r.to_dict() for r in relevance_results],
+                    {
+                        "stats": filter_stats.to_dict(),
+                        "results": [r.to_dict() for r in filter_results]
+                    },
                     f,
                     ensure_ascii=False,
                     indent=2
                 )
+        else:
+            # No filtering - use all clusters above min size
+            clusters = [c for c in clusters_all if c.size >= settings.min_cluster_size_for_report]
         
-        # Phase 2: Analyze
+        console.print(f"  ✓ Using {len(clusters)} clusters for analysis")
+        
+        # Get filtered responses from included clusters
+        filtered_responses = []
+        for cluster in clusters:
+            filtered_responses.extend(cluster.responses)
+        
+        # Phase 3: Analyze
         task = progress.add_task("[cyan]Detecting stances...", total=None)
         stance_detector = StanceDetector()
         stance_results = stance_detector.analyze_responses(filtered_responses)
         stance_distribution = stance_detector.get_stance_distribution(stance_results)
         progress.update(task, completed=True)
         
-        task = progress.add_task("[cyan]Clustering responses...", total=None)
-        clusterer = TopicClusterer(settings)
-        clusters_all = clusterer.cluster_responses(filtered_responses)
-        # Filter clusters by minimum size for report
-        clusters = [c for c in clusters_all if c.size >= settings.min_cluster_size_for_report]
-        progress.update(task, completed=True)
-        
-        console.print(f"  ✓ Found {len(clusters_all)} clusters ({len(clusters)} with {settings.min_cluster_size_for_report}+ responses)")
-        
         task = progress.add_task("[cyan]Detecting minority opinions...", total=None)
         minority_detector = MinorityDetector(settings)
-        minorities = minority_detector.detect_minorities(filtered_responses)
+        # Detect minorities from ALL responses (including noise cluster)
+        # Use min_score from settings (default 0.5 = 5/10 scale)
+        minorities = minority_detector.detect_minorities(
+            extraction_result.responses,
+            min_score=settings.minority_min_score,
+        )
         progress.update(task, completed=True)
         
         console.print(f"  ✓ Found {len(minorities)} minority opinions")
@@ -268,6 +310,7 @@ async def _run_pipeline(
                     stance_distribution=stance_distribution,
                     cluster_summaries=cluster_summaries,
                     minority_opinions=minorities,
+                    ronten_context=ronten_context,
                 )
                 
                 # Save Multi-LLM outputs
@@ -290,6 +333,7 @@ async def _run_pipeline(
                     stance_distribution=stance_distribution,
                     cluster_summaries=cluster_summaries,
                     minority_opinions=minorities,
+                    ronten_context=ronten_context,
                 )
                 progress.update(task, completed=True)
             
@@ -332,6 +376,7 @@ async def _run_pipeline(
                 overall_summary=overall_summary,
                 persona_analysis=persona_result.to_dict() if persona_result else None,
                 multi_llm_consensus=multi_llm_result.to_dict() if multi_llm_result else None,
+                filter_stats=filter_stats.to_dict() if filter_stats else None,
             )
             
             outputs = report_generator.save_report(

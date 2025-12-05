@@ -104,6 +104,10 @@ class Settings(BaseSettings):
         default=10,
         description="Number of minority opinions to extract"
     )
+    minority_min_score: float = Field(
+        default=0.5,
+        description="Minimum outlier score for minority opinions (0-1, equivalent to 5/10)"
+    )
     minority_relevance_check: bool = Field(
         default=True,
         description="Enable LLM-based relevance check for minority opinions"
@@ -121,6 +125,14 @@ class Settings(BaseSettings):
     relevance_batch_size: int = Field(
         default=10,
         description="Batch size for relevance filtering"
+    )
+    
+    # Context / Ronten File Settings
+    ronten_file_mapping: dict = Field(
+        default={
+            "bill-of-lading": "naoyo4san_ronten_20251205.txt"
+        },
+        description="Mapping from survey slug to ronten (issue points) file"
     )
     
     # Summarization Settings
