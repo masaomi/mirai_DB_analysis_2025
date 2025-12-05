@@ -1,14 +1,18 @@
 """Generate overall summary from cluster summaries."""
 
 import asyncio
+import json
 from dataclasses import dataclass, field
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, TYPE_CHECKING
 
 from config.settings import Settings, get_settings
 from core.llm_client import LLMClient
 from pipeline.analyzers.stance_detector import StanceResult
 from pipeline.analyzers.minority_detector import MinorityOpinion
 from .cluster_summarizer import ClusterSummary
+
+if TYPE_CHECKING:
+    from orchestration.multi_llm import MultiLLMOrchestrator, ConsensusResult
 
 
 OVERALL_SUMMARY_PROMPT = """あなたは法案検討を支援するアンケート分析の専門家です。
@@ -252,4 +256,123 @@ class OverallSummarizer:
             cluster_summaries=cluster_summaries,
             minority_opinions=minority_opinions,
         ))
+    
+    async def generate_summary_multi_llm(
+        self,
+        orchestrator: "MultiLLMOrchestrator",
+        survey_title: str,
+        total_responses: int,
+        date_range: tuple[str, str],
+        stance_distribution: Dict[str, Dict[str, Any]],
+        cluster_summaries: List[ClusterSummary],
+        minority_opinions: List[MinorityOpinion],
+    ) -> tuple["OverallSummary", "ConsensusResult"]:
+        """Generate overall summary using Multi-LLM consensus.
+        
+        Args:
+            orchestrator: MultiLLMOrchestrator instance
+            survey_title: Survey title
+            total_responses: Total number of responses
+            date_range: Date range tuple
+            stance_distribution: Stance distribution data
+            cluster_summaries: List of cluster summaries
+            minority_opinions: List of minority opinions
+            
+        Returns:
+            Tuple of (OverallSummary, ConsensusResult)
+        """
+        # Format stance distribution
+        stance_text = "\n".join(
+            f"- {stance}: {data['count']}件 ({data['percentage']:.1f}%)"
+            for stance, data in stance_distribution.items()
+        )
+        
+        # Format cluster summaries with cluster IDs and session IDs
+        clusters_text = "\n\n".join(
+            f"### クラスタ {cs.cluster_id}: {cs.cluster_label} ({cs.response_count}件)\n"
+            f"**主張**: {cs.group_assertion}\n"
+            f"**論点**: {', '.join(cs.main_points)}\n"
+            f"**感情傾向**: {cs.overall_sentiment}\n"
+            f"**特徴**: {', '.join(cs.distinguishing_features)}\n"
+            f"**代表的セッション**: {', '.join(getattr(cs, 'representative_session_ids', [])[:3])}"
+            for cs in cluster_summaries
+        )
+        
+        # Format minority opinions with session IDs
+        minorities_text = "\n".join(
+            f"- (セッション: {mo.session_id}, スコア: {mo.outlier_score:.2f}) {mo.content[:200]}..."
+            for mo in minority_opinions[:10]
+        ) if minority_opinions else "特になし"
+        
+        # Build prompt
+        prompt = OVERALL_SUMMARY_PROMPT.format(
+            survey_title=survey_title,
+            total_responses=total_responses,
+            date_range=f"{date_range[0]} ～ {date_range[1]}",
+            stance_distribution=stance_text,
+            cluster_summaries=clusters_text,
+            minority_opinions=minorities_text,
+        )
+        
+        # Add instruction to include references
+        prompt += """
+
+重要: 分析結果には、可能な限り根拠となるセッションIDやクラスタIDを含めてください。
+例: 「セキュリティへの懸念が多い（クラスタ3、セッションabc123参照）」
+"""
+        
+        # Use Multi-LLM consensus
+        consensus_result = await orchestrator.reach_consensus_iterative(
+            prompt,
+            system_prompt="あなたは法案分析の専門家です。多角的な視点から法案の影響を分析し、建設的な提言を行ってください。"
+        )
+        
+        # Parse consensus content
+        try:
+            content = consensus_result.consensus_content
+            json_start = content.find('{')
+            json_end = content.rfind('}') + 1
+            if json_start >= 0 and json_end > json_start:
+                data = json.loads(content[json_start:json_end])
+            else:
+                raise ValueError("No JSON found in consensus")
+            
+            summary = OverallSummary(
+                survey_title=survey_title,
+                total_responses=total_responses,
+                date_range=date_range,
+                executive_summary=data.get("executive_summary", ""),
+                key_findings=data.get("key_findings", []),
+                consensus_points=data.get("consensus_points", []),
+                disagreement_points=data.get("disagreement_points", []),
+                recommended_actions=data.get("recommended_actions", []),
+                caveats=data.get("caveats", []),
+                supporting_insights=data.get("supporting_insights", []),
+                concerns=data.get("concerns", []),
+                expert_insights=data.get("expert_insights", []),
+                stance_distribution=stance_distribution,
+                cluster_summaries=cluster_summaries,
+                minority_opinions=minority_opinions,
+            )
+        except Exception:
+            # Fallback: use consensus content as executive summary
+            summary = OverallSummary(
+                survey_title=survey_title,
+                total_responses=total_responses,
+                date_range=date_range,
+                executive_summary=consensus_result.consensus_content[:500] if consensus_result.consensus_content else "",
+                key_findings=[],
+                consensus_points=consensus_result.agreement_points if hasattr(consensus_result, 'agreement_points') else [],
+                disagreement_points=consensus_result.disagreements,
+                recommended_actions=[],
+                caveats=["Multi-LLM合意形成の結果を解析できませんでした。"],
+                supporting_insights=[],
+                concerns=[],
+                expert_insights=[],
+                stance_distribution=stance_distribution,
+                cluster_summaries=cluster_summaries,
+                minority_opinions=minority_opinions,
+            )
+        
+        return summary, consensus_result
 

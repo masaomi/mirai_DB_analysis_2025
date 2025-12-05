@@ -185,10 +185,12 @@ async def _run_pipeline(
         
         task = progress.add_task("[cyan]Clustering responses...", total=None)
         clusterer = TopicClusterer(settings)
-        clusters = clusterer.cluster_responses(extraction_result.responses)
+        clusters_all = clusterer.cluster_responses(extraction_result.responses)
+        # Filter clusters by minimum size for report
+        clusters = [c for c in clusters_all if c.size >= settings.min_cluster_size_for_report]
         progress.update(task, completed=True)
         
-        console.print(f"  ✓ Found {len(clusters)} clusters")
+        console.print(f"  ✓ Found {len(clusters_all)} clusters ({len(clusters)} with {settings.min_cluster_size_for_report}+ responses)")
         
         task = progress.add_task("[cyan]Detecting minority opinions...", total=None)
         minority_detector = MinorityDetector(settings)
@@ -200,72 +202,44 @@ async def _run_pipeline(
         # Phase 3: Summarize with LLM
         cluster_summaries = []
         overall_summary = None
+        multi_llm_result = None
         
         if not skip_summarization:
             llm_client = LLMClient(settings)
+            
+            # Filter minority opinions by relevance if enabled
+            if settings.minority_relevance_check and minorities:
+                task = progress.add_task("[cyan]Filtering minority opinions by relevance...", total=None)
+                minorities_before = len(minorities)
+                minorities = await minority_detector.filter_by_relevance(
+                    minorities,
+                    extraction_result.survey_title,
+                    llm_client,
+                )
+                progress.update(task, completed=True)
+                console.print(f"  ✓ Filtered minorities: {minorities_before} → {len(minorities)} (relevant only)")
             
             task = progress.add_task("[cyan]Summarizing clusters...", total=None)
             cluster_summarizer = ClusterSummarizer(settings, llm_client)
             cluster_summaries = await cluster_summarizer.summarize_all_clusters(clusters)
             progress.update(task, completed=True)
             
-            task = progress.add_task("[cyan]Generating overall summary...", total=None)
+            # Generate overall summary
             overall_summarizer = OverallSummarizer(settings, llm_client)
-            overall_summary = await overall_summarizer.generate_summary(
-                survey_title=extraction_result.survey_title,
-                total_responses=extraction_result.response_count,
-                date_range=extraction_result.date_range,
-                stance_distribution=stance_distribution,
-                cluster_summaries=cluster_summaries,
-                minority_opinions=minorities,
-            )
-            progress.update(task, completed=True)
             
-            # Multi-LLM orchestration
-            multi_llm_result = None
             if multi_llm:
-                task = progress.add_task("[cyan]Running multi-LLM consensus...", total=None)
+                # Use Multi-LLM consensus for overall summary
+                task = progress.add_task("[cyan]Generating overall summary (Multi-LLM)...", total=None)
                 orchestrator = MultiLLMOrchestrator(settings)
                 
-                # i-1 Grand Prix: Extract bill-focused insights with multi-LLM
-                consensus_prompt = f"""あなたは法案検討を支援する分析の専門家です。
-以下のインタビュー分析結果から、法案を検討する際に参考になる知見を抽出してください。
-
-## インタビュー情報
-- テーマ: {extraction_result.survey_title}
-- 総回答数: {extraction_result.response_count}
-
-## 立場分布
-{chr(10).join(f"- {k}: {v['count']}件 ({v['percentage']:.1f}%)" for k, v in stance_distribution.items())}
-
-## 主要クラスタと意見傾向
-各クラスタIDは参照時に使用してください。
-{chr(10).join(f'''
-### クラスタ {cs.cluster_id}: {cs.cluster_label} ({cs.response_count}件)
-- 主張: {cs.group_assertion}
-- 論点: {", ".join(cs.main_points[:3])}
-- 感情傾向: {cs.overall_sentiment}
-- 代表的セッションID: {", ".join(getattr(cs, "representative_session_ids", []))}
-''' for cs in cluster_summaries[:10])}
-
-## マイノリティ意見（重要な独自視点）
-{chr(10).join(f"- (セッション: {mo.session_id}, スコア: {mo.outlier_score:.2f}) {mo.content[:150]}..." for mo in minorities[:10])}
-
-## 指示
-以下の観点で分析し、法案検討に役立つ知見を抽出してください：
-
-1. **法案をサポートする知見**: 法案の意義を裏付ける実務課題やメリット
-2. **法案への懸念点**: リスク、不都合、運用コスト問題など
-3. **専門家・当事者からの具体的指摘**: 深い経験に基づく重要な意見
-4. **総合的な推奨事項**: 法案検討者へのアドバイス
-
-重要:
-- 可能な限り、根拠となるセッションIDやクラスタIDを明示してください
-- 分析結果を日本語で詳しく説明してください
-"""
-                multi_llm_result = await orchestrator.reach_consensus_iterative(
-                    consensus_prompt,
-                    system_prompt="あなたは法案分析の専門家です。多角的な視点から法案の影響を分析し、建設的な提言を行ってください。"
+                overall_summary, multi_llm_result = await overall_summarizer.generate_summary_multi_llm(
+                    orchestrator=orchestrator,
+                    survey_title=extraction_result.survey_title,
+                    total_responses=extraction_result.response_count,
+                    date_range=extraction_result.date_range,
+                    stance_distribution=stance_distribution,
+                    cluster_summaries=cluster_summaries,
+                    minority_opinions=minorities,
                 )
                 
                 # Save Multi-LLM outputs
@@ -278,6 +252,18 @@ async def _run_pipeline(
                 progress.update(task, completed=True)
                 console.print(f"  ✓ Multi-LLM agreement score: {multi_llm_result.agreement_score:.2f}")
                 console.print(f"  ✓ Saved Multi-LLM logs to {output_dir}/multi_llm/")
+            else:
+                # Use single LLM for overall summary
+                task = progress.add_task("[cyan]Generating overall summary...", total=None)
+                overall_summary = await overall_summarizer.generate_summary(
+                    survey_title=extraction_result.survey_title,
+                    total_responses=extraction_result.response_count,
+                    date_range=extraction_result.date_range,
+                    stance_distribution=stance_distribution,
+                    cluster_summaries=cluster_summaries,
+                    minority_opinions=minorities,
+                )
+                progress.update(task, completed=True)
             
             # Persona analysis
             persona_result = None
@@ -330,17 +316,18 @@ async def _run_pipeline(
             for fmt, path in outputs.items():
                 console.print(f"  ✓ Saved {fmt}: {path}")
         
-        # Build cluster details for visualization (needed for charts and data export)
+        # Build cluster details for visualization (use all clusters for full picture)
         import json
         
         cluster_details = []
-        for c in clusters:
+        for c in clusters_all:
             cluster_details.append({
                 "cluster_id": int(c.cluster_id),  # Convert numpy int64 to Python int
                 "label": c.label,
                 "size": int(c.size),
                 "keywords": c.keywords,
                 "sample_responses": [r.content[:200] for r in c.responses[:3]],
+                "included_in_report": c.size >= settings.min_cluster_size_for_report,
             })
         
         # Sort by size descending
@@ -390,7 +377,9 @@ async def _run_pipeline(
             "generated_at": datetime.now().isoformat(),
             "response_count": extraction_result.response_count,
             "stance_distribution": stance_distribution,
-            "cluster_count": len(clusters),
+            "cluster_count": len(clusters_all),
+            "cluster_count_in_report": len(clusters),
+            "min_cluster_size_for_report": settings.min_cluster_size_for_report,
             "cluster_details": cluster_details,
             "minority_count": len(minorities),
             "minority_opinions": [

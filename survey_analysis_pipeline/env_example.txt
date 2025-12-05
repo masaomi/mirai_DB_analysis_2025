@@ -33,8 +33,10 @@ OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
 # ===================
 MIN_RESPONSE_LENGTH=10
 CLUSTERING_MIN_SAMPLES=3
+MIN_CLUSTER_SIZE_FOR_REPORT=10
 MINORITY_THRESHOLD=0.1
 MINORITY_TOP_N=10
+MINORITY_RELEVANCE_CHECK=true
 
 # ===================
 # Summarization Settings

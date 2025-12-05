@@ -1,12 +1,39 @@
 """Detect minority/outlier opinions that may be important."""
 
+import asyncio
+import json
 from dataclasses import dataclass, field
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, TYPE_CHECKING
 from collections import Counter
 import numpy as np
 
 from pipeline.extractors.response_extractor import UserResponse
 from config.settings import Settings, get_settings
+
+if TYPE_CHECKING:
+    from core.llm_client import LLMClient
+
+
+RELEVANCE_PROMPT = """以下の意見が「{survey_title}」に関連する実質的な意見かどうか判定してください。
+
+## 意見
+{content}
+
+## 判定基準
+以下のいずれかに該当する場合は「関連なし」と判定：
+- 挨拶・お礼・激励のみ（例：「ありがとうございました」「頑張ってください」）
+- 法案・テーマの内容に直接言及していない
+- インタビューの進行に関するコメントのみ
+
+以下のいずれかに該当する場合は「関連あり」と判定：
+- 法案・テーマに対する賛否の表明がある
+- 具体的な懸念点や提案がある
+- 実務経験や専門知識に基づく意見がある
+
+## 出力形式
+JSON形式で出力してください：
+{{"relevant": true または false, "reason": "判定理由を簡潔に"}}
+"""
 
 
 @dataclass
@@ -280,4 +307,65 @@ class MinorityDetector:
             "reasons": dict(reasons),
             "minorities": [m.to_dict() for m in minorities],
         }
+    
+    async def filter_by_relevance(
+        self,
+        minorities: List[MinorityOpinion],
+        survey_title: str,
+        llm_client: "LLMClient",
+    ) -> List[MinorityOpinion]:
+        """Filter minority opinions by relevance to the survey topic using LLM.
+        
+        Args:
+            minorities: List of minority opinions to filter
+            survey_title: Title of the survey for context
+            llm_client: LLM client for relevance checking
+            
+        Returns:
+            List of relevant minority opinions
+        """
+        if not minorities:
+            return []
+        
+        async def check_relevance(opinion: MinorityOpinion) -> tuple[MinorityOpinion, bool]:
+            """Check if a single opinion is relevant."""
+            prompt = RELEVANCE_PROMPT.format(
+                survey_title=survey_title,
+                content=opinion.content[:500],  # Truncate for efficiency
+            )
+            
+            try:
+                response = await llm_client.acomplete(prompt)
+                
+                # Parse JSON response
+                json_start = response.find('{')
+                json_end = response.rfind('}') + 1
+                if json_start >= 0 and json_end > json_start:
+                    data = json.loads(response[json_start:json_end])
+                    is_relevant = data.get("relevant", True)
+                    return (opinion, is_relevant)
+                else:
+                    # If parsing fails, include by default
+                    return (opinion, True)
+            except Exception:
+                # On error, include by default
+                return (opinion, True)
+        
+        # Check all opinions in parallel
+        tasks = [check_relevance(m) for m in minorities]
+        results = await asyncio.gather(*tasks)
+        
+        # Filter to keep only relevant opinions
+        relevant = [opinion for opinion, is_relevant in results if is_relevant]
+        
+        return relevant
+    
+    def filter_by_relevance_sync(
+        self,
+        minorities: List[MinorityOpinion],
+        survey_title: str,
+        llm_client: "LLMClient",
+    ) -> List[MinorityOpinion]:
+        """Synchronous wrapper for filter_by_relevance."""
+        return asyncio.run(self.filter_by_relevance(minorities, survey_title, llm_client))
 

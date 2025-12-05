@@ -92,6 +92,10 @@ class Settings(BaseSettings):
         default=3,
         description="Minimum samples for HDBSCAN clustering"
     )
+    min_cluster_size_for_report: int = Field(
+        default=10,
+        description="Minimum cluster size to include in report (smaller clusters handled as minority)"
+    )
     minority_threshold: float = Field(
         default=0.1,
         description="Top percentage for minority detection"
@@ -99,6 +103,10 @@ class Settings(BaseSettings):
     minority_top_n: int = Field(
         default=10,
         description="Number of minority opinions to extract"
+    )
+    minority_relevance_check: bool = Field(
+        default=True,
+        description="Enable LLM-based relevance check for minority opinions"
     )
     
     # Summarization Settings
