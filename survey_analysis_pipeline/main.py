@@ -28,7 +28,7 @@ from pipeline.summarizers.overall_summarizer import OverallSummarizer
 from pipeline.generators.report_generator import ReportGenerator, ReportData
 from pipeline.generators.chart_generator import ChartGenerator
 from pipeline.generators.index_builder import IndexBuilder
-from orchestration.multi_llm import MultiLLMOrchestrator
+from orchestration.multi_llm import MultiLLMOrchestrator, save_multi_llm_outputs
 from orchestration.persona_assembly import PersonaAssembly
 
 
@@ -239,15 +239,17 @@ async def _run_pipeline(
 {chr(10).join(f"- {k}: {v['count']}件 ({v['percentage']:.1f}%)" for k, v in stance_distribution.items())}
 
 ## 主要クラスタと意見傾向
+各クラスタIDは参照時に使用してください。
 {chr(10).join(f'''
-### {cs.cluster_label} ({cs.response_count}件)
+### クラスタ {cs.cluster_id}: {cs.cluster_label} ({cs.response_count}件)
 - 主張: {cs.group_assertion}
 - 論点: {", ".join(cs.main_points[:3])}
 - 感情傾向: {cs.overall_sentiment}
-''' for cs in cluster_summaries[:5])}
+- 代表的セッションID: {", ".join(getattr(cs, "representative_session_ids", []))}
+''' for cs in cluster_summaries[:10])}
 
 ## マイノリティ意見（重要な独自視点）
-{chr(10).join(f"- (スコア: {mo.outlier_score:.2f}) {mo.content[:150]}..." for mo in minorities[:5])}
+{chr(10).join(f"- (セッション: {mo.session_id}, スコア: {mo.outlier_score:.2f}) {mo.content[:150]}..." for mo in minorities[:10])}
 
 ## 指示
 以下の観点で分析し、法案検討に役立つ知見を抽出してください：
@@ -257,14 +259,25 @@ async def _run_pipeline(
 3. **専門家・当事者からの具体的指摘**: 深い経験に基づく重要な意見
 4. **総合的な推奨事項**: 法案検討者へのアドバイス
 
-分析結果を日本語で詳しく説明してください。
+重要:
+- 可能な限り、根拠となるセッションIDやクラスタIDを明示してください
+- 分析結果を日本語で詳しく説明してください
 """
-                multi_llm_result = await orchestrator.reach_consensus(
+                multi_llm_result = await orchestrator.reach_consensus_iterative(
                     consensus_prompt,
                     system_prompt="あなたは法案分析の専門家です。多角的な視点から法案の影響を分析し、建設的な提言を行ってください。"
                 )
+                
+                # Save Multi-LLM outputs
+                output_files = save_multi_llm_outputs(
+                    multi_llm_result,
+                    output_dir,
+                    extraction_result.survey_title
+                )
+                
                 progress.update(task, completed=True)
                 console.print(f"  ✓ Multi-LLM agreement score: {multi_llm_result.agreement_score:.2f}")
+                console.print(f"  ✓ Saved Multi-LLM logs to {output_dir}/multi_llm/")
             
             # Persona analysis
             persona_result = None

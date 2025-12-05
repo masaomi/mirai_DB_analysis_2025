@@ -184,6 +184,7 @@ REPORT_TEMPLATE = """# {{ survey_title }} - 分析レポート
 複数のLLMモデルによる分析結果を統合しました。
 
 **合意スコア**: {{ "%.1f"|format(multi_llm_consensus.agreement_score * 100) }}%
+**議論ラウンド数**: {{ multi_llm_consensus.discussion_rounds | length }}
 
 ### 統合された知見
 
@@ -196,6 +197,31 @@ REPORT_TEMPLATE = """# {{ survey_title }} - 分析レポート
 - {{ disagreement }}
 {% endfor %}
 {% endif %}
+
+{% if multi_llm_consensus.referenced_sessions or multi_llm_consensus.referenced_clusters %}
+### 参照情報
+
+{% if multi_llm_consensus.referenced_sessions %}
+**参照セッション**:
+{% for session in multi_llm_consensus.referenced_sessions -%}
+- [セッション {{ session }}](https://depth-interview-ai.vercel.app/report/{{ session }})
+{% endfor %}
+{% endif %}
+
+{% if multi_llm_consensus.referenced_clusters %}
+**参照クラスタ**:
+{% for cluster_id in multi_llm_consensus.referenced_clusters -%}
+- クラスタ {{ cluster_id }}
+{% endfor %}
+{% endif %}
+
+{% endif %}
+
+### 詳細レポート
+
+- [議論ログ (discussion_log.md)](multi_llm/discussion_log.md)
+- [評価マトリクス (evaluation_matrix.json)](multi_llm/evaluation_matrix.json)
+- [合意レポート (consensus_report.md)](multi_llm/consensus_report.md)
 
 {% endif %}
 
