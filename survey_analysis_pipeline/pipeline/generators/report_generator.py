@@ -30,6 +30,7 @@ REPORT_TEMPLATE = """# {{ survey_title }} - 分析レポート
 - [主要な発見事項](#key-findings)
 {% if multi_llm_consensus %}- [Multi-LLM 分析結果](#multi-llm-analysis){% endif %}
 {% if ronten_summaries %}- [論点別分析](#ronten-analysis){% endif %}
+{% if novel_insights %}- [論点にない新しい視点](#novel-insights){% endif %}
 - [質的スコア凡例](#quality-legend)
 - [意見クラスタ別分析](#cluster-analysis)
 - [合意点と対立点](#consensus-disagreement)
@@ -278,17 +279,19 @@ REPORT_TEMPLATE = """# {{ survey_title }} - 分析レポート
 {% endfor %}
 
 {% if novel_insights %}
-### ★ 論点にない新しい視点
+<a id="novel-insights"></a>
+
+## 💡 論点にない新しい視点
 
 法制審議会の議論で明示的に取り上げられていない、回答者から得られた新しい視点です。
 
 {% for insight in novel_insights %}
-#### {{ loop.index }}. {{ insight.summary }}
+### {{ loop.index }}. 「{{ insight.summary }}」
 
-> {{ insight.content[:300] }}{% if insight.content|length > 300 %}...{% endif %}
+{{ insight.content[:300] }}{% if insight.content|length > 300 %}...{% endif %}
 
 {% if insight.session_id %}
-[参照セッション](https://depth-interview-ai.vercel.app/report/{{ insight.session_id }})
+📎 [元のインタビューを見る](https://depth-interview-ai.vercel.app/report/{{ insight.session_id }})
 {% endif %}
 
 {% endfor %}
@@ -322,9 +325,12 @@ REPORT_TEMPLATE = """# {{ survey_title }} - 分析レポート
 
 {% if cluster.quality_score %}
 **質的スコア**: {% for i in range(5) %}{% if cluster.quality_score.combined_score >= (i+1)*0.2 %}★{% else %}☆{% endif %}{% endfor %} ({{ "%.2f"|format(cluster.quality_score.combined_score) }})
-- 専門性: {{ "%.2f"|format(cluster.quality_score.expertise_score) }}
-- 具体性: {{ "%.2f"|format(cluster.quality_score.specificity_score) }}
-- 新規性: {{ "%.2f"|format(cluster.quality_score.novelty_score) }}
+- 専門性: {{ "%.2f"|format(cluster.quality_score.expertise_score) }}{% if cluster.quality_score.expertise_reasoning %} - {{ cluster.quality_score.expertise_reasoning }}{% endif %}
+
+- 具体性: {{ "%.2f"|format(cluster.quality_score.specificity_score) }}{% if cluster.quality_score.specificity_reasoning %} - {{ cluster.quality_score.specificity_reasoning }}{% endif %}
+
+- 新規性: {{ "%.2f"|format(cluster.quality_score.novelty_score) }}{% if cluster.quality_score.novelty_reasoning %} - {{ cluster.quality_score.novelty_reasoning }}{% endif %}
+
 {% endif %}
 
 **このグループの主張**: {{ cluster.group_assertion }}
@@ -533,8 +539,9 @@ class ReportGenerator:
             "consensus_points": summary.consensus_points,
             "disagreement_points": summary.disagreement_points,
             "minority_opinions": [mo.to_dict() for mo in summary.minority_opinions],
-            "recommended_actions": summary.recommended_actions,
-            "caveats": summary.caveats,
+            # Recommended actions and caveats
+            "recommended_actions": summary.recommended_actions or [],
+            "caveats": summary.caveats or [],
             # i-1 Grand Prix: Bill-focused insights
             "supporting_insights": summary.supporting_insights,
             "concerns": summary.concerns,

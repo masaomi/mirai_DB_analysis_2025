@@ -32,14 +32,15 @@ SCORING_PROMPT = """あなたは政策分析の専門家です。以下の意見
    - 0.0 (ありふれた意見) 〜 1.0 (独自の鋭い視点)
 
 ## 出力形式
-以下のJSON形式のみを出力してください。説明は不要です。
+以下のJSON形式のみを出力してください。各スコアの理由は簡潔に（30文字程度）。
 
 {{
     "expertise_score": 0.5,
+    "expertise_reasoning": "専門用語や実務経験に基づく評価の理由",
     "specificity_score": 0.5,
+    "specificity_reasoning": "具体性の評価の理由",
     "novelty_score": 0.5,
-    "expertise_indicators": ["専門用語の使用", "実務経験への言及"],
-    "reasoning": "評価の理由を簡潔に"
+    "novelty_reasoning": "新規性の評価の理由"
 }}
 """
 
@@ -51,8 +52,10 @@ class QualityScore:
     specificity_score: float = 0.0
     novelty_score: float = 0.0
     combined_score: float = 0.0
-    expertise_indicators: List[str] = field(default_factory=list)
-    reasoning: str = ""
+    # Individual reasoning for each score
+    expertise_reasoning: str = ""
+    specificity_reasoning: str = ""
+    novelty_reasoning: str = ""
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary."""
@@ -61,8 +64,9 @@ class QualityScore:
             "specificity_score": self.specificity_score,
             "novelty_score": self.novelty_score,
             "combined_score": self.combined_score,
-            "expertise_indicators": self.expertise_indicators,
-            "reasoning": self.reasoning,
+            "expertise_reasoning": self.expertise_reasoning,
+            "specificity_reasoning": self.specificity_reasoning,
+            "novelty_reasoning": self.novelty_reasoning,
         }
 
 
@@ -134,8 +138,9 @@ class QualityScorer:
                     specificity_score=specificity,
                     novelty_score=novelty,
                     combined_score=combined,
-                    expertise_indicators=data.get("expertise_indicators", []),
-                    reasoning=data.get("reasoning", "")
+                    expertise_reasoning=data.get("expertise_reasoning", ""),
+                    specificity_reasoning=data.get("specificity_reasoning", ""),
+                    novelty_reasoning=data.get("novelty_reasoning", ""),
                 )
             else:
                 return QualityScore()
