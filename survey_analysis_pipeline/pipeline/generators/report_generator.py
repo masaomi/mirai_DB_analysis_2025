@@ -534,7 +534,7 @@ class ReportGenerator:
             "total_responses": summary.total_responses,
             "executive_summary": summary.executive_summary,
             "stance_distribution": summary.stance_distribution,
-            "key_findings": summary.key_findings,
+            "key_findings": summary.key_findings or [],
             "cluster_summaries": [cs.to_dict() for cs in sorted_clusters],
             "consensus_points": summary.consensus_points,
             "disagreement_points": summary.disagreement_points,

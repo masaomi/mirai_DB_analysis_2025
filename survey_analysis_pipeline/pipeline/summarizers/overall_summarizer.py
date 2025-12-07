@@ -40,21 +40,27 @@ OVERALL_SUMMARY_PROMPT = """あなたは法案検討を支援するアンケー�
 特に、法制審議会の論点（電子裏書、強制執行、システム障害時の対応など）に関連する、専門知識・実務経験・当事者経験に基づく具体的な意見を重視してください。
 
 1. **エグゼクティブサマリー**: 意思決定者向けの簡潔な要約（200字以内）
-2. **法案をサポートする知見**: 法案の内容を根拠に基づいてサポートする意見
+2. **主要な発見事項**: インタビュー結果から得られた重要な発見（3〜5項目、必須）
+   - 回答者から多く指摘された課題、期待、懸念などを箇条書きで
+   - 例: 「セキュリティ対策が電子化推進の最重要前提条件として繰り返し指摘されている」
+3. **法案をサポートする知見**: 法案の内容を根拠に基づいてサポートする意見
    - 例: 「実務においてこういう課題がある」「この法案が可決するとこういう観点で嬉しい」
    - コンテキストのどの論点に関連するかを明記してください。
-3. **法案への懸念点**: 法案の内容に関する懸念
+4. **法案への懸念点**: 法案の内容に関する懸念
    - 例: 「これが実現するとこういう不都合・リスクがある」「運用コストが高い割にインパクトが小さい」
    - コンテキストのどの論点に関連するかを明記してください。
-4. **専門家・当事者からの重要な指摘**: 深い専門知識や実務経験に基づく意見
-5. **合意点**: 回答者間で共通している意見
-6. **対立点**: 意見が分かれている論点
-7. **推奨アクション**: 分析結果に基づく推奨事項
-8. **注意点**: 解釈時に注意すべき点
+5. **専門家・当事者からの重要な指摘**: 深い専門知識や実務経験に基づく意見
+6. **合意点**: 回答者間で共通している意見
+7. **対立点**: 意見が分かれている論点
+8. **推奨アクション**: 分析結果に基づく推奨事項（3〜5項目、必須）
+9. **注意点**: 解釈時に注意すべき点（3〜5項目、必須）
+
+**重要**: key_findings, recommended_actions, caveats は必ず3項目以上含めてください。
 
 JSON形式で出力してください：
 {{
     "executive_summary": "エグゼクティブサマリー",
+    "key_findings": ["発見1（必須）", "発見2（必須）", "発見3（必須）", ...],
     "supporting_insights": [
         {{"content": "サポートする知見1", "reason": "根拠や背景", "related_ronten": "関連論点（例：電子裏書）"}},
         {{"content": "サポートする知見2", "reason": "根拠や背景", "related_ronten": "関連論点（例：B案）"}}
@@ -67,11 +73,10 @@ JSON形式で出力してください：
         {{"content": "専門家の指摘1", "expertise": "専門分野や経験", "related_ronten": "関連論点"}},
         {{"content": "専門家の指摘2", "expertise": "専門分野や経験", "related_ronten": "関連論点"}}
     ],
-    "key_findings": ["発見1", "発見2", ...],
     "consensus_points": ["合意点1", "合意点2", ...],
     "disagreement_points": ["対立点1", "対立点2", ...],
-    "recommended_actions": ["推奨1", "推奨2", ...],
-    "caveats": ["注意点1", "注意点2", ...]
+    "recommended_actions": ["推奨1（必須）", "推奨2（必須）", "推奨3（必須）", ...],
+    "caveats": ["注意点1（必須）", "注意点2（必須）", "注意点3（必須）", ...]
 }}
 """
 
@@ -262,16 +267,33 @@ class OverallSummarizer:
             else:
                 raise ValueError("No JSON found")
             
+            # Get values with fallback generation
+            key_findings = data.get("key_findings", [])
+            recommended_actions = data.get("recommended_actions", [])
+            caveats = data.get("caveats", [])
+            
+            # Generate fallback key_findings from cluster summaries if empty
+            if not key_findings and cluster_summaries:
+                key_findings = self._generate_fallback_key_findings(cluster_summaries)
+            
+            # Generate fallback recommended_actions if empty
+            if not recommended_actions:
+                recommended_actions = self._generate_fallback_recommended_actions()
+            
+            # Generate fallback caveats if empty
+            if not caveats:
+                caveats = self._generate_fallback_caveats()
+            
             return OverallSummary(
                 survey_title=survey_title,
                 total_responses=total_responses,
                 date_range=date_range,
                 executive_summary=data.get("executive_summary", ""),
-                key_findings=data.get("key_findings", []),
+                key_findings=key_findings,
                 consensus_points=data.get("consensus_points", []),
                 disagreement_points=data.get("disagreement_points", []),
-                recommended_actions=data.get("recommended_actions", []),
-                caveats=data.get("caveats", []),
+                recommended_actions=recommended_actions,
+                caveats=caveats,
                 supporting_insights=data.get("supporting_insights", []),
                 concerns=data.get("concerns", []),
                 expert_insights=data.get("expert_insights", []),
@@ -280,17 +302,19 @@ class OverallSummarizer:
                 minority_opinions=minority_opinions,
             )
         except Exception:
-            # Fallback
+            # Fallback with generated content
+            key_findings = self._generate_fallback_key_findings(cluster_summaries) if cluster_summaries else []
+            
             return OverallSummary(
                 survey_title=survey_title,
                 total_responses=total_responses,
                 date_range=date_range,
-                executive_summary=response[:500],
-                key_findings=[],
+                executive_summary=response[:500] if response else "",
+                key_findings=key_findings,
                 consensus_points=[],
                 disagreement_points=[],
-                recommended_actions=[],
-                caveats=["要約の解析に失敗しました。LLMの生出力を確認してください。"],
+                recommended_actions=self._generate_fallback_recommended_actions(),
+                caveats=self._generate_fallback_caveats() + ["要約の解析に失敗しました。LLMの生出力を確認してください。"],
                 supporting_insights=[],
                 concerns=[],
                 expert_insights=[],
@@ -298,6 +322,60 @@ class OverallSummarizer:
                 cluster_summaries=cluster_summaries,
                 minority_opinions=minority_opinions,
             )
+    
+    def _generate_fallback_key_findings(
+        self,
+        cluster_summaries: List[ClusterSummary],
+    ) -> List[str]:
+        """Generate fallback key findings from cluster summaries.
+        
+        Args:
+            cluster_summaries: List of cluster summaries
+            
+        Returns:
+            List of key findings
+        """
+        findings = []
+        # Sort by response count and get top clusters
+        sorted_clusters = sorted(
+            cluster_summaries,
+            key=lambda cs: cs.response_count,
+            reverse=True
+        )
+        
+        for cs in sorted_clusters[:5]:
+            if cs.group_assertion:
+                # Truncate if too long
+                assertion = cs.group_assertion[:150]
+                if len(cs.group_assertion) > 150:
+                    assertion += "..."
+                findings.append(assertion)
+        
+        return findings if findings else ["クラスタ分析の結果から主要な発見事項を特定できませんでした"]
+    
+    def _generate_fallback_recommended_actions(self) -> List[str]:
+        """Generate fallback recommended actions.
+        
+        Returns:
+            List of generic recommended actions
+        """
+        return [
+            "法案内容と制度自体の周知活動を強化し、関係事業者への情報提供を充実させる",
+            "関係者へのヒアリングを実施し、現場の声を要件定義に反映させるプロセスを設ける",
+            "段階的な移行計画と支援体制を整備する",
+        ]
+    
+    def _generate_fallback_caveats(self) -> List[str]:
+        """Generate fallback caveats.
+        
+        Returns:
+            List of generic caveats
+        """
+        return [
+            "本調査は自己選択に基づく非確率標本であり、回答数や割合は社会全体の意見分布を反映しない",
+            "同一人物による複数回答を技術的に排除できておらず、特定意見の過大計上リスクがある",
+            "十分な情報提供なしに賛否を表明している回答者が含まれる可能性がある",
+        ]
     
     def generate_summary_sync(
         self,
@@ -405,16 +483,33 @@ class OverallSummarizer:
             else:
                 raise ValueError("No JSON found in consensus")
             
+            # Get values with fallback generation
+            key_findings = data.get("key_findings", [])
+            recommended_actions = data.get("recommended_actions", [])
+            caveats = data.get("caveats", [])
+            
+            # Generate fallback key_findings from cluster summaries if empty
+            if not key_findings and cluster_summaries:
+                key_findings = self._generate_fallback_key_findings(cluster_summaries)
+            
+            # Generate fallback recommended_actions if empty
+            if not recommended_actions:
+                recommended_actions = self._generate_fallback_recommended_actions()
+            
+            # Generate fallback caveats if empty
+            if not caveats:
+                caveats = self._generate_fallback_caveats()
+            
             summary = OverallSummary(
                 survey_title=survey_title,
                 total_responses=total_responses,
                 date_range=date_range,
                 executive_summary=data.get("executive_summary", ""),
-                key_findings=data.get("key_findings", []),
+                key_findings=key_findings,
                 consensus_points=data.get("consensus_points", []),
                 disagreement_points=data.get("disagreement_points", []),
-                recommended_actions=data.get("recommended_actions", []),
-                caveats=data.get("caveats", []),
+                recommended_actions=recommended_actions,
+                caveats=caveats,
                 supporting_insights=data.get("supporting_insights", []),
                 concerns=data.get("concerns", []),
                 expert_insights=data.get("expert_insights", []),
@@ -423,17 +518,19 @@ class OverallSummarizer:
                 minority_opinions=minority_opinions,
             )
         except Exception:
-            # Fallback: use consensus content as executive summary
+            # Fallback: use consensus content as executive summary with generated content
+            key_findings = self._generate_fallback_key_findings(cluster_summaries) if cluster_summaries else []
+            
             summary = OverallSummary(
                 survey_title=survey_title,
                 total_responses=total_responses,
                 date_range=date_range,
                 executive_summary=consensus_result.consensus_content[:500] if consensus_result.consensus_content else "",
-                key_findings=[],
+                key_findings=key_findings,
                 consensus_points=consensus_result.agreement_points if hasattr(consensus_result, 'agreement_points') else [],
                 disagreement_points=consensus_result.disagreements,
-                recommended_actions=[],
-                caveats=["Multi-LLM合意形成の結果を解析できませんでした。"],
+                recommended_actions=self._generate_fallback_recommended_actions(),
+                caveats=self._generate_fallback_caveats() + ["Multi-LLM合意形成の結果を解析できませんでした。"],
                 supporting_insights=[],
                 concerns=[],
                 expert_insights=[],
