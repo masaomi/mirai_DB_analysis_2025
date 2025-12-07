@@ -27,6 +27,7 @@ from pipeline.analyzers.topic_clusterer import TopicClusterer
 from pipeline.analyzers.minority_detector import MinorityDetector
 from pipeline.analyzers.ronten_matcher import RontenMatcher
 from pipeline.summarizers.cluster_summarizer import ClusterSummarizer
+from pipeline.analyzers.quality_scorer import QualityScorer
 from pipeline.summarizers.overall_summarizer import OverallSummarizer, RontenSummary, NovelInsight
 from pipeline.generators.report_generator import ReportGenerator, ReportData
 from pipeline.generators.chart_generator import ChartGenerator
@@ -294,6 +295,14 @@ async def _run_pipeline(
             cluster_summarizer = ClusterSummarizer(settings, llm_client)
             cluster_summaries = await cluster_summarizer.summarize_all_clusters(clusters)
             progress.update(task, completed=True)
+            
+            # Quality Scoring
+            if settings.quality_scoring_enabled:
+                task = progress.add_task("[cyan]Scoring cluster quality...", total=None)
+                scorer = QualityScorer(settings, llm_client)
+                cluster_summaries = await scorer.score_all_clusters(cluster_summaries)
+                progress.update(task, completed=True)
+                console.print(f"  ✓ Scored {len(cluster_summaries)} clusters")
             
             # Ronten-based analysis
             ronten_summaries = []

@@ -55,6 +55,7 @@ class ClusterSummary:
     keywords: List[str]
     chunk_summaries: List[ChunkSummary]
     representative_session_ids: List[str] = None  # Session IDs for reference URLs
+    quality_score: Optional[Any] = None  # QualityScore object (avoid circular import)
     
     def __post_init__(self):
         if self.representative_session_ids is None:
@@ -73,6 +74,7 @@ class ClusterSummary:
             "distinguishing_features": self.distinguishing_features,
             "keywords": self.keywords,
             "representative_session_ids": self.representative_session_ids,
+            "quality_score": self.quality_score.to_dict() if self.quality_score else None,
         }
 
 

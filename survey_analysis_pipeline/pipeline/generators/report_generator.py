@@ -19,13 +19,54 @@ REPORT_TEMPLATE = """# {{ survey_title }} - 分析レポート
 
 ---
 
+<a id="toc"></a>
+
+## 📑 目次
+
+- [エグゼクティブサマリー](#executive-summary)
+- [量的解釈の制約](#quantitative-bias)
+{% if filter_stats %}- [フィルタリング統計](#filter-stats){% endif %}
+- [回答者の立場分布](#stance-distribution)
+- [主要な発見事項](#key-findings)
+{% if multi_llm_consensus %}- [Multi-LLM 分析結果](#multi-llm-analysis){% endif %}
+{% if ronten_summaries %}- [論点別分析](#ronten-analysis){% endif %}
+- [質的スコア凡例](#quality-legend)
+- [意見クラスタ別分析](#cluster-analysis)
+- [合意点と対立点](#consensus-disagreement)
+- [マイノリティ意見](#minority-opinions)
+- [推奨アクション](#recommended-actions)
+- [解釈上の注意点](#caveats)
+
+
+---
+
+<a id="executive-summary"></a>
+
 ## エグゼクティブサマリー
 
 {{ executive_summary }}
 
 ---
 
+<a id="quantitative-bias"></a>
+
+## ⚠️ 量的解釈の制約（政治領域固有の注意点）
+
+> **重要**: 本調査は回答者の自己選択に基づく非確率標本調査です。以下の制約を踏まえてお読みください。
+
+| 制約 | 説明 |
+|------|------|
+| **一人一回答の保証なし** | 同一人物による複数回答を技術的に排除できていません |
+| **インセンティブの非対称性** | 法案に強い利害を持つ層（推進派/反対派）が回答しやすい構造です |
+| **代表性の欠如** | 回答割合は日本社会全体の意見分布を反映しません |
+
+**本レポートの読み方**: 「何％がこう考えている」ではなく「どのような視点・論点が存在するか」という **意見の多様性のマッピング** としてお読みください。回答数の多寡は意見の重要性や正当性を示すものではありません。
+
+---
+
 {% if filter_stats %}
+<a id="filter-stats"></a>
+
 ## 📜 フィルタリング統計
 
 クラスタベースの関連性フィルタリング（効率的なLLM判定）の統計です。
@@ -105,7 +146,11 @@ REPORT_TEMPLATE = """# {{ survey_title }} - 分析レポート
 
 ---
 
+<a id="stance-distribution"></a>
+
 ## 回答者の立場分布
+
+> ⚠️ この割合は**回答者プール内**の分布であり、社会全体の意見分布を反映するものではありません。
 
 | 立場 | 回答数 | 割合 |
 |------|--------|------|
@@ -115,6 +160,8 @@ REPORT_TEMPLATE = """# {{ survey_title }} - 分析レポート
 
 ---
 
+<a id="key-findings"></a>
+
 ## 主要な発見事項
 
 {% for finding in key_findings -%}
@@ -123,7 +170,66 @@ REPORT_TEMPLATE = """# {{ survey_title }} - 分析レポート
 
 ---
 
+{% if multi_llm_consensus %}
+<a id="multi-llm-analysis"></a>
+
+## 🤖 Multi-LLM 分析結果
+
+複数のLLMモデルによる分析結果を統合しました。
+
+### スコア詳細
+
+| 指標 | 値 | 説明 |
+|------|-----|------|
+| **合意スコア** | {{ "%.1f"|format(multi_llm_consensus.agreement_score * 100) }}% | `合意点数 / (合意点数 + 対立点数)` |
+{% if multi_llm_consensus.discussion_rounds %}
+| **相互評価平均スコア** | {{ "%.1f"|format(multi_llm_consensus.discussion_rounds[-1].consensus_score * 100) }}% | 各LLMが他のLLM回答を評価した平均（0-10点を正規化） |
+{% endif %}
+| **議論ラウンド数** | {{ multi_llm_consensus.discussion_rounds | length }} | 合意形成までの反復回数 |
+
+### 統合された知見
+
+{{ multi_llm_consensus.consensus_content }}
+
+{% if multi_llm_consensus.disagreements %}
+### ⚠️ モデル間で意見が分かれた点
+
+{% for disagreement in multi_llm_consensus.disagreements -%}
+- {{ disagreement }}
+{% endfor %}
+{% endif %}
+
+{% if multi_llm_consensus.referenced_sessions or multi_llm_consensus.referenced_clusters %}
+### 参照情報
+
+{% if multi_llm_consensus.referenced_sessions %}
+**参照セッション**:
+{% for session in multi_llm_consensus.referenced_sessions -%}
+- [セッション {{ session[:8] }}...](https://depth-interview-ai.vercel.app/report/{{ session }})
+{% endfor %}
+{% endif %}
+
+{% if multi_llm_consensus.referenced_clusters %}
+**参照クラスタ**:
+{% for cluster_id in multi_llm_consensus.referenced_clusters -%}
+- クラスタ {{ cluster_id }}
+{% endfor %}
+{% endif %}
+
+{% endif %}
+
+### 詳細レポート
+
+- [議論ログ (discussion_log.md)](multi_llm/discussion_log.md)
+- [評価マトリクス (evaluation_matrix.json)](multi_llm/evaluation_matrix.json)
+- [合意レポート (consensus_report.md)](multi_llm/consensus_report.md)
+
+---
+{% endif %}
+
 {% if ronten_summaries %}
+<a id="ronten-analysis"></a>
+
 ## 📋 論点別分析
 
 法制審議会で議論されている主要論点ごとに、インタビュー結果を整理しました。
@@ -172,18 +278,17 @@ REPORT_TEMPLATE = """# {{ survey_title }} - 分析レポート
 {% endfor %}
 
 {% if novel_insights %}
-### ★ 新規論点（審議会で議論されていない視点）
+### ★ 論点にない新しい視点
 
-以下は法制審議会の論点には含まれていない、新しい視点や指摘です：
+法制審議会の議論で明示的に取り上げられていない、回答者から得られた新しい視点です。
 
 {% for insight in novel_insights %}
-#### ★ {{ insight.summary }}
+#### {{ loop.index }}. {{ insight.summary }}
 
 > {{ insight.content[:300] }}{% if insight.content|length > 300 %}...{% endif %}
 
-**種別**: {{ insight.insight_type }}
 {% if insight.session_id %}
-📎 [元のインタビュー](https://depth-interview-ai.vercel.app/report/{{ insight.session_id }})
+[参照セッション](https://depth-interview-ai.vercel.app/report/{{ insight.session_id }})
 {% endif %}
 
 {% endfor %}
@@ -192,10 +297,35 @@ REPORT_TEMPLATE = """# {{ survey_title }} - 分析レポート
 ---
 {% endif %}
 
+<a id="quality-legend"></a>
+
+## 📊 質的スコア凡例
+
+本レポートでは、各意見クラスタに対して以下の観点から質的評価を行っています：
+
+| 指標 | 説明 | 重み |
+|------|------|------|
+| **専門性** | 実務経験・業界用語・具体的事例の有無 | 40% |
+| **具体性** | 数字・データ・ケーススタディの含有 | 30% |
+| **新規性** | 他クラスタにない独自の視点 | 30% |
+
+> 質的スコアが高い意見は、回答数が少なくても政策検討において重要な示唆を含む可能性があります。
+
+---
+
+<a id="cluster-analysis"></a>
+
 ## 意見クラスタ別分析
 
 {% for cluster in cluster_summaries %}
-### {{ cluster.cluster_label }} ({{ cluster.response_count }}件)
+### 「{{ cluster.cluster_label }}」 ({{ cluster.response_count }}件)
+
+{% if cluster.quality_score %}
+**質的スコア**: {% for i in range(5) %}{% if cluster.quality_score.combined_score >= (i+1)*0.2 %}★{% else %}☆{% endif %}{% endfor %} ({{ "%.2f"|format(cluster.quality_score.combined_score) }})
+- 専門性: {{ "%.2f"|format(cluster.quality_score.expertise_score) }}
+- 具体性: {{ "%.2f"|format(cluster.quality_score.specificity_score) }}
+- 新規性: {{ "%.2f"|format(cluster.quality_score.novelty_score) }}
+{% endif %}
 
 **このグループの主張**: {{ cluster.group_assertion }}
 
@@ -225,6 +355,8 @@ REPORT_TEMPLATE = """# {{ survey_title }} - 分析レポート
 
 ---
 
+<a id="consensus-disagreement"></a>
+
 ## 合意点と対立点
 
 ### ✅ 合意が見られる点
@@ -240,6 +372,8 @@ REPORT_TEMPLATE = """# {{ survey_title }} - 分析レポート
 {% endfor %}
 
 ---
+
+<a id="minority-opinions"></a>
 
 ## 🔍 注目すべきマイノリティ意見
 
@@ -266,6 +400,8 @@ REPORT_TEMPLATE = """# {{ survey_title }} - 分析レポート
 
 ---
 
+<a id="recommended-actions"></a>
+
 ## 📋 推奨アクション
 
 {% for action in recommended_actions -%}
@@ -274,6 +410,8 @@ REPORT_TEMPLATE = """# {{ survey_title }} - 分析レポート
 
 ---
 
+<a id="caveats"></a>
+
 ## ⚠️ 解釈上の注意点
 
 {% for caveat in caveats -%}
@@ -281,60 +419,6 @@ REPORT_TEMPLATE = """# {{ survey_title }} - 分析レポート
 {% endfor %}
 
 ---
-
-{% if multi_llm_consensus %}
-## 🤖 Multi-LLM 分析結果
-
-複数のLLMモデルによる分析結果を統合しました。
-
-### スコア詳細
-
-| 指標 | 値 | 説明 |
-|------|-----|------|
-| **合意スコア** | {{ "%.1f"|format(multi_llm_consensus.agreement_score * 100) }}% | `合意点数 / (合意点数 + 対立点数)` |
-{% if multi_llm_consensus.discussion_rounds %}
-| **相互評価平均スコア** | {{ "%.1f"|format(multi_llm_consensus.discussion_rounds[-1].consensus_score * 100) }}% | 各LLMが他のLLM回答を評価した平均（0-10点を正規化） |
-{% endif %}
-| **議論ラウンド数** | {{ multi_llm_consensus.discussion_rounds | length }} | 合意形成までの反復回数 |
-
-### 統合された知見
-
-{{ multi_llm_consensus.consensus_content }}
-
-{% if multi_llm_consensus.disagreements %}
-### モデル間で意見が分かれた点
-
-{% for disagreement in multi_llm_consensus.disagreements -%}
-- {{ disagreement }}
-{% endfor %}
-{% endif %}
-
-{% if multi_llm_consensus.referenced_sessions or multi_llm_consensus.referenced_clusters %}
-### 参照情報
-
-{% if multi_llm_consensus.referenced_sessions %}
-**参照セッション**:
-{% for session in multi_llm_consensus.referenced_sessions -%}
-- [セッション {{ session }}](https://depth-interview-ai.vercel.app/report/{{ session }})
-{% endfor %}
-{% endif %}
-
-{% if multi_llm_consensus.referenced_clusters %}
-**参照クラスタ**:
-{% for cluster_id in multi_llm_consensus.referenced_clusters -%}
-- クラスタ {{ cluster_id }}
-{% endfor %}
-{% endif %}
-
-{% endif %}
-
-### 詳細レポート
-
-- [議論ログ (discussion_log.md)](multi_llm/discussion_log.md)
-- [評価マトリクス (evaluation_matrix.json)](multi_llm/evaluation_matrix.json)
-- [合意レポート (consensus_report.md)](multi_llm/consensus_report.md)
-
-{% endif %}
 
 {% if persona_analysis %}
 ## 🎭 多視点分析（ペルソナ分析）
@@ -410,12 +494,32 @@ class ReportGenerator:
         """
         summary = data.overall_summary
         
-        # Sort cluster summaries by response_count (descending)
-        sorted_clusters = sorted(
-            summary.cluster_summaries,
-            key=lambda cs: cs.response_count,
-            reverse=True
-        )
+        # Sort cluster summaries
+        # If quality scoring is enabled and sort is requested, sort by quality score
+        # Otherwise sort by response_count
+        
+        # Determine sorting method
+        if (self.settings.quality_scoring_enabled and 
+            self.settings.quality_score_sort_clusters and 
+            any(cs.quality_score for cs in summary.cluster_summaries)):
+            
+            # Primary sort: Quality Score (descending)
+            # Secondary sort: Response Count (descending)
+            sorted_clusters = sorted(
+                summary.cluster_summaries,
+                key=lambda cs: (
+                    cs.quality_score.combined_score if cs.quality_score else 0,
+                    cs.response_count
+                ),
+                reverse=True
+            )
+        else:
+            # Default: Response Count (descending)
+            sorted_clusters = sorted(
+                summary.cluster_summaries,
+                key=lambda cs: cs.response_count,
+                reverse=True
+            )
         
         context = {
             "survey_title": summary.survey_title,
@@ -538,6 +642,13 @@ class ReportGenerator:
             padding: 0.2rem 0.4rem;
             border-radius: 3px;
             font-family: 'Monaco', 'Menlo', monospace;
+        }}
+        a {{
+            color: #007bff;
+            text-decoration: none;
+        }}
+        a:hover {{
+            text-decoration: underline;
         }}
     </style>
 </head>

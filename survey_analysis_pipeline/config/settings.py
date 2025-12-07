@@ -170,6 +170,28 @@ class Settings(BaseSettings):
         default=False,
         description="Enable persona assembly"
     )
+
+    # Quality Scoring Settings (Policy B)
+    quality_scoring_enabled: bool = Field(
+        default=True,
+        description="Enable qualitative scoring for clusters"
+    )
+    quality_score_weight_expertise: float = Field(
+        default=0.4,
+        description="Weight for expertise score"
+    )
+    quality_score_weight_specificity: float = Field(
+        default=0.3,
+        description="Weight for specificity score"
+    )
+    quality_score_weight_novelty: float = Field(
+        default=0.3,
+        description="Weight for novelty score"
+    )
+    quality_score_sort_clusters: bool = Field(
+        default=True,
+        description="Sort clusters by quality score in report"
+    )
     
     # Cache Settings
     cache_enabled: bool = Field(
