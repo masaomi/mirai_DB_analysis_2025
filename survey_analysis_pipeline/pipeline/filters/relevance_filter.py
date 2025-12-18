@@ -2,12 +2,23 @@
 
 import asyncio
 import json
+import re
 from dataclasses import dataclass
 from typing import List, Dict, Any, Optional, Tuple
 
 from pipeline.extractors.response_extractor import UserResponse
 from config.settings import Settings, get_settings
 from core.llm_client import LLMClient
+
+
+# Noise patterns to exclude before LLM check
+NOISE_PATTERNS = [
+    r"野獣先輩",
+    r"草$|w+$",  # ネットスラング終わり
+    r"^test$|^テスト$",
+    r"^あ+$",
+    r"うんち|うんこ",  # 不適切な言葉
+]
 
 
 @dataclass
@@ -52,9 +63,11 @@ RELEVANCE_PROMPT = """以下の回答が「{survey_title}」に関する法案�
 3. **専門知識・実務経験に基づく具体的意見**（expert）
    - 現場の具体的な事例や深い洞察を含むもの
 
-## 除外すべき回答（relevant: false）
+## 絶対に除外すべき回答（relevant: false）
+- **ネットミーム・ジョーク（野獣先輩等）**
+- **意味不明な文字列**
+- **法案と全く無関係な雑談**
 - 挨拶・お礼・激励のみ
-- テーマに関係ない話題
 - 内容が短すぎる/空虚な回答（「わからない」「特になし」等）
 
 ## 指示
@@ -143,6 +156,19 @@ class RelevanceFilter:
         Returns:
             RelevanceResult object
         """
+        # Pre-check for noise patterns to save LLM calls
+        for pattern in NOISE_PATTERNS:
+            if re.search(pattern, response.content):
+                return RelevanceResult(
+                    session_id=response.session_id,
+                    is_relevant=False,
+                    relevance_score=0.0,
+                    reason="Noise pattern detected (regex match)",
+                    insight_type="none",
+                    extracted_insight="",
+                    related_ronten="",
+                )
+
         # Truncate context if too long to avoid token limits, though ronten files are usually manageable
         # Prioritize ronten context over full response length if needed
         context_str = ronten_context[:2000] if ronten_context else "（特になし）"
@@ -194,4 +220,3 @@ class RelevanceFilter:
                 extracted_insight="",
                 related_ronten="",
             )
-

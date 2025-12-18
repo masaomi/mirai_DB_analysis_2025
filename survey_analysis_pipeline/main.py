@@ -112,6 +112,10 @@ def analyze(
         False, "--persona", "-P",
         help="Enable persona assembly analysis"
     ),
+    compact: bool = typer.Option(
+        False, "--compact", "-c",
+        help="Generate compact report (summary for policymakers)"
+    ),
     skip_summarization: bool = typer.Option(
         False, "--skip-summarization",
         help="Skip LLM summarization (analysis only)"
@@ -137,7 +141,8 @@ def analyze(
         f"[bold blue]Analyzing Survey: {survey_slug}[/bold blue]\n"
         f"Provider: {settings.llm_provider.value}\n"
         f"Multi-LLM: {'Enabled' if multi_llm else 'Disabled'}\n"
-        f"Persona: {'Enabled' if persona else 'Disabled'}",
+        f"Persona: {'Enabled' if persona else 'Disabled'}\n"
+        f"Compact Report: {'Yes' if compact else 'No'}",
         title="Survey Analysis Pipeline",
     ))
     
@@ -148,6 +153,7 @@ def analyze(
         settings=settings,
         multi_llm=multi_llm,
         persona=persona,
+        compact=compact,
         skip_summarization=skip_summarization,
         skip_charts=skip_charts,
         skip_index=skip_index,
@@ -160,6 +166,7 @@ async def _run_pipeline(
     settings: Settings,
     multi_llm: bool,
     persona: bool,
+    compact: bool,
     skip_summarization: bool,
     skip_charts: bool,
     skip_index: bool,
@@ -171,203 +178,206 @@ async def _run_pipeline(
     
     try:
         with Progress(
-        SpinnerColumn(),
-        TextColumn("[progress.description]{task.description}"),
-        console=console,
-    ) as progress:
-        
-        # Phase 1: Extract data
-        task = progress.add_task("[cyan]Extracting responses...", total=None)
-        extractor = ResponseExtractor(settings)
-        extraction_result = extractor.extract_responses(survey_slug)
-        progress.update(task, completed=True)
-        
-        console.print(f"  ✓ Extracted {extraction_result.response_count} responses")
-        
-        # Phase 1.2: Load Ronten Context (if available)
-        ronten_loader = RontenLoader(settings)
-        ronten_context = ronten_loader.load_ronten_content(survey_slug)
-        if ronten_context:
-            console.print(f"  ✓ Loaded ronten context ({len(ronten_context)} chars)")
-        else:
-            console.print(f"  - No specific ronten context found for {survey_slug}")
-        
-        # Phase 2: Cluster first (embedding-based, no LLM needed)
-        task = progress.add_task("[cyan]Clustering responses...", total=None)
-        clusterer = TopicClusterer(settings)
-        clusters_all = clusterer.cluster_responses(extraction_result.responses)
-        progress.update(task, completed=True)
-        
-        console.print(f"  ✓ Found {len(clusters_all)} clusters")
-        
-        # Phase 2.5: Filter clusters (much fewer LLM calls than per-response)
-        filter_stats = None
-        filter_results = []
-        
-        if settings.relevance_filter_enabled:
-            task = progress.add_task("[cyan]Filtering clusters by relevance...", total=None)
-            cluster_filter = ClusterBasedFilter(settings, llm_client)
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            console=console,
+        ) as progress:
             
-            clusters, filter_results, filter_stats = await cluster_filter.filter_clusters(
-                clusters_all,
-                extraction_result.survey_title,
-                ronten_context=ronten_context,
+            # Phase 1: Extract data
+            task = progress.add_task("[cyan]Extracting responses...", total=None)
+            extractor = ResponseExtractor(settings)
+            extraction_result = extractor.extract_responses(survey_slug)
+            progress.update(task, completed=True)
+            
+            console.print(f"  ✓ Extracted {extraction_result.response_count} responses")
+            
+            # Phase 1.2: Load Ronten Context (if available)
+            ronten_loader = RontenLoader(settings)
+            ronten_context = ronten_loader.load_ronten_content(survey_slug)
+            if ronten_context:
+                console.print(f"  ✓ Loaded ronten context ({len(ronten_context)} chars)")
+            else:
+                console.print(f"  - No specific ronten context found for {survey_slug}")
+            
+            # Phase 2: Cluster first (embedding-based, no LLM needed)
+            task = progress.add_task("[cyan]Clustering responses...", total=None)
+            clusterer = TopicClusterer(settings)
+            clusters_all = clusterer.cluster_responses(extraction_result.responses)
+            progress.update(task, completed=True)
+            
+            console.print(f"  ✓ Found {len(clusters_all)} clusters")
+            
+            # Phase 2.5: Filter clusters (much fewer LLM calls than per-response)
+            filter_stats = None
+            filter_results = []
+            
+            if settings.relevance_filter_enabled:
+                task = progress.add_task("[cyan]Filtering clusters by relevance...", total=None)
+                # Use shared client
+                cluster_filter = ClusterBasedFilter(settings, llm_client)
+                
+                clusters, filter_results, filter_stats = await cluster_filter.filter_clusters(
+                    clusters_all,
+                    extraction_result.survey_title,
+                    ronten_context=ronten_context,
+                )
+                progress.update(task, completed=True)
+                
+                # Display stats
+                console.print(Panel(
+                    f"[bold]Cluster Filter Stats[/bold]\n"
+                    f"Total Clusters: {filter_stats.total_clusters}\n"
+                    f"Auto-included (≥{settings.min_cluster_size_for_report}): {filter_stats.auto_included_clusters}\n"
+                    f"LLM-checked: {filter_stats.llm_checked_clusters}\n"
+                    f"Excluded: {filter_stats.excluded_clusters}\n"
+                    f"Noise responses: {filter_stats.noise_responses}\n\n"
+                    f"[bold]Efficiency:[/bold]\n"
+                    f"LLM calls made: {filter_stats.llm_calls_made}\n"
+                    f"LLM calls saved: {filter_stats.llm_calls_saved} (vs per-response)\n"
+                    f"Final responses: {filter_stats.final_responses} / {filter_stats.total_responses}",
+                    title="Cluster-Based Filter",
+                    border_style="yellow"
+                ))
+                
+                # Save filter results
+                import json
+                filter_log_path = output_dir / "cluster_filter_log.json"
+                with open(filter_log_path, 'w', encoding='utf-8') as f:
+                    json.dump(
+                        {
+                            "stats": filter_stats.to_dict(),
+                            "results": [r.to_dict() for r in filter_results]
+                        },
+                        f,
+                        ensure_ascii=False,
+                        indent=2
+                    )
+            else:
+                # No filtering - use all clusters above min size
+                clusters = [c for c in clusters_all if c.size >= settings.min_cluster_size_for_report]
+            
+            console.print(f"  ✓ Using {len(clusters)} clusters for analysis")
+            
+            # Get filtered responses from included clusters
+            filtered_responses = []
+            for cluster in clusters:
+                filtered_responses.extend(cluster.responses)
+            
+            # Phase 3: Analyze
+            task = progress.add_task("[cyan]Detecting stances...", total=None)
+            stance_detector = StanceDetector()
+            stance_results = stance_detector.analyze_responses(filtered_responses)
+            stance_distribution = stance_detector.get_stance_distribution(stance_results)
+            progress.update(task, completed=True)
+            
+            task = progress.add_task("[cyan]Detecting minority opinions...", total=None)
+            minority_detector = MinorityDetector(settings)
+            # Detect minorities from ALL responses (including noise cluster)
+            # Use min_score from settings (default 0.5 = 5/10 scale)
+            minorities = minority_detector.detect_minorities(
+                extraction_result.responses,
+                min_score=settings.minority_min_score,
             )
             progress.update(task, completed=True)
             
-            # Display stats
-            console.print(Panel(
-                f"[bold]Cluster Filter Stats[/bold]\n"
-                f"Total Clusters: {filter_stats.total_clusters}\n"
-                f"Auto-included (≥{settings.min_cluster_size_for_report}): {filter_stats.auto_included_clusters}\n"
-                f"LLM-checked: {filter_stats.llm_checked_clusters}\n"
-                f"Excluded: {filter_stats.excluded_clusters}\n"
-                f"Noise responses: {filter_stats.noise_responses}\n\n"
-                f"[bold]Efficiency:[/bold]\n"
-                f"LLM calls made: {filter_stats.llm_calls_made}\n"
-                f"LLM calls saved: {filter_stats.llm_calls_saved} (vs per-response)\n"
-                f"Final responses: {filter_stats.final_responses} / {filter_stats.total_responses}",
-                title="Cluster-Based Filter",
-                border_style="yellow"
-            ))
+            console.print(f"  ✓ Found {len(minorities)} minority opinions")
             
-            # Save filter results
-            import json
-            filter_log_path = output_dir / "cluster_filter_log.json"
-            with open(filter_log_path, 'w', encoding='utf-8') as f:
-                json.dump(
-                    {
-                        "stats": filter_stats.to_dict(),
-                        "results": [r.to_dict() for r in filter_results]
-                    },
-                    f,
-                    ensure_ascii=False,
-                    indent=2
-                )
-        else:
-            # No filtering - use all clusters above min size
-            clusters = [c for c in clusters_all if c.size >= settings.min_cluster_size_for_report]
-        
-        console.print(f"  ✓ Using {len(clusters)} clusters for analysis")
-        
-        # Get filtered responses from included clusters
-        filtered_responses = []
-        for cluster in clusters:
-            filtered_responses.extend(cluster.responses)
-        
-        # Phase 3: Analyze
-        task = progress.add_task("[cyan]Detecting stances...", total=None)
-        stance_detector = StanceDetector()
-        stance_results = stance_detector.analyze_responses(filtered_responses)
-        stance_distribution = stance_detector.get_stance_distribution(stance_results)
-        progress.update(task, completed=True)
-        
-        task = progress.add_task("[cyan]Detecting minority opinions...", total=None)
-        minority_detector = MinorityDetector(settings)
-        # Detect minorities from ALL responses (including noise cluster)
-        # Use min_score from settings (default 0.5 = 5/10 scale)
-        minorities = minority_detector.detect_minorities(
-            extraction_result.responses,
-            min_score=settings.minority_min_score,
-        )
-        progress.update(task, completed=True)
-        
-        console.print(f"  ✓ Found {len(minorities)} minority opinions")
-        
-        # Phase 3: Summarize with LLM
-        cluster_summaries = []
-        overall_summary = None
-        multi_llm_result = None
-        
-        if not skip_summarization:
-            # Filter minority opinions by relevance if enabled
-            if settings.minority_relevance_check and minorities:
-                task = progress.add_task("[cyan]Filtering minority opinions by relevance...", total=None)
-                minorities_before = len(minorities)
-                minorities = await minority_detector.filter_by_relevance(
-                    minorities,
-                    extraction_result.survey_title,
-                    llm_client,
-                )
+            # Phase 3: Summarize with LLM
+            cluster_summaries = []
+            overall_summary = None
+            multi_llm_result = None
+            
+            if not skip_summarization:
+                # Use shared client
+                
+                # Filter minority opinions by relevance if enabled
+                if settings.minority_relevance_check and minorities:
+                    task = progress.add_task("[cyan]Filtering minority opinions by relevance...", total=None)
+                    minorities_before = len(minorities)
+                    minorities = await minority_detector.filter_by_relevance(
+                        minorities,
+                        extraction_result.survey_title,
+                        llm_client,
+                    )
+                    progress.update(task, completed=True)
+                    console.print(f"  ✓ Filtered minorities: {minorities_before} → {len(minorities)} (relevant only)")
+                
+                task = progress.add_task("[cyan]Summarizing clusters...", total=None)
+                cluster_summarizer = ClusterSummarizer(settings, llm_client)
+                cluster_summaries = await cluster_summarizer.summarize_all_clusters(clusters)
                 progress.update(task, completed=True)
-                console.print(f"  ✓ Filtered minorities: {minorities_before} → {len(minorities)} (relevant only)")
-            
-            task = progress.add_task("[cyan]Summarizing clusters...", total=None)
-            cluster_summarizer = ClusterSummarizer(settings, llm_client)
-            cluster_summaries = await cluster_summarizer.summarize_all_clusters(clusters)
-            progress.update(task, completed=True)
-            
-            # Quality Scoring
-            if settings.quality_scoring_enabled:
-                task = progress.add_task("[cyan]Scoring cluster quality...", total=None)
-                scorer = QualityScorer(settings, llm_client)
-                cluster_summaries = await scorer.score_all_clusters(cluster_summaries)
-                progress.update(task, completed=True)
-                console.print(f"  ✓ Scored {len(cluster_summaries)} clusters")
-            
-            # Ronten-based analysis
-            ronten_summaries = []
-            novel_insights = []
-            ronten_items = ronten_loader.get_ronten_items(survey_slug)
-            
-            if ronten_items:
-                task = progress.add_task("[cyan]Matching opinions to legislative discussion points...", total=None)
-                ronten_matcher = RontenMatcher(settings, llm_client)
                 
-                # Prepare opinions from cluster summaries for ronten matching
-                opinions_for_matching = []
-                for cs in cluster_summaries:
-                    # Use cluster assertion and main points as representative opinion
-                    content = f"{cs.group_assertion}. {'. '.join(cs.main_points)}"
-                    if cs.representative_quote:
-                        content += f" 代表的意見: {cs.representative_quote}"
-                    opinions_for_matching.append({
-                        "content": content,
-                        "cluster_id": cs.cluster_id,
-                        "cluster_label": cs.cluster_label,
-                        "response_count": cs.response_count,
-                        "session_ids": getattr(cs, 'representative_session_ids', []),
-                    })
+                # Quality Scoring
+                if settings.quality_scoring_enabled:
+                    task = progress.add_task("[cyan]Scoring cluster quality...", total=None)
+                    scorer = QualityScorer(settings, llm_client)
+                    cluster_summaries = await scorer.score_all_clusters(cluster_summaries)
+                    progress.update(task, completed=True)
+                    console.print(f"  ✓ Scored {len(cluster_summaries)} clusters")
                 
-                # Add minority opinions
-                for mo in minorities:
-                    opinions_for_matching.append({
-                        "content": mo.content,
-                        "session_id": mo.session_id,
-                        "is_minority": True,
-                    })
+                # Ronten-based analysis
+                ronten_summaries = []
+                novel_insights = []
+                ronten_items = ronten_loader.get_ronten_items(survey_slug)
                 
-                # Match to ronten
-                ronten_analyses, novel_opinions = await ronten_matcher.analyze_by_ronten(
-                    opinions_for_matching,
-                    survey_slug,
-                )
-                
-                progress.update(task, completed=True)
-                console.print(f"  ✓ Matched opinions to {len(ronten_analyses)} discussion points")
-                if novel_opinions:
-                    console.print(f"  ✓ Found {len(novel_opinions)} novel insights not in legislative discussion")
-                
-                # Generate ronten summaries using LLM
-                task = progress.add_task("[cyan]Generating ronten-based summaries...", total=None)
-                
-                for analysis in ronten_analyses:
-                    # Collect all opinions for this ronten
-                    all_opinions = (
-                        analysis.supporting_opinions +
-                        analysis.concerns +
-                        analysis.expert_opinions +
-                        analysis.general_opinions
+                if ronten_items:
+                    task = progress.add_task("[cyan]Matching opinions to legislative discussion points...", total=None)
+                    ronten_matcher = RontenMatcher(settings, llm_client)
+                    
+                    # Prepare opinions from cluster summaries for ronten matching
+                    opinions_for_matching = []
+                    for cs in cluster_summaries:
+                        # Use cluster assertion and main points as representative opinion
+                        content = f"{cs.group_assertion}. {'. '.join(cs.main_points)}"
+                        if cs.representative_quote:
+                            content += f" 代表的意見: {cs.representative_quote}"
+                        opinions_for_matching.append({
+                            "content": content,
+                            "cluster_id": cs.cluster_id,
+                            "cluster_label": cs.cluster_label,
+                            "response_count": cs.response_count,
+                            "session_ids": getattr(cs, 'representative_session_ids', []),
+                        })
+                    
+                    # Add minority opinions
+                    for mo in minorities:
+                        opinions_for_matching.append({
+                            "content": mo.content,
+                            "session_id": mo.session_id,
+                            "is_minority": True,
+                        })
+                    
+                    # Match to ronten
+                    ronten_analyses, novel_opinions = await ronten_matcher.analyze_by_ronten(
+                        opinions_for_matching,
+                        survey_slug,
                     )
                     
-                    # Generate summary for this ronten
-                    if all_opinions:
-                        opinions_text = "\n".join(
-                            f"- {op.get('content', '')[:200]}"
-                            for op in all_opinions[:10]
+                    progress.update(task, completed=True)
+                    console.print(f"  ✓ Matched opinions to {len(ronten_analyses)} discussion points")
+                    if novel_opinions:
+                        console.print(f"  ✓ Found {len(novel_opinions)} novel insights not in legislative discussion")
+                    
+                    # Generate ronten summaries using LLM
+                    task = progress.add_task("[cyan]Generating ronten-based summaries...", total=None)
+                    
+                    for analysis in ronten_analyses:
+                        # Collect all opinions for this ronten
+                        all_opinions = (
+                            analysis.supporting_opinions +
+                            analysis.concerns +
+                            analysis.expert_opinions +
+                            analysis.general_opinions
                         )
                         
-                        summary_prompt = f"""以下は「{analysis.ronten_title}」（法制審議会論点）に関連する意見です。
+                        # Generate summary for this ronten
+                        if all_opinions:
+                            opinions_text = "\n".join(
+                                f"- {op.get('content', '')[:200]}"
+                                for op in all_opinions[:10]
+                            )
+                            
+                            summary_prompt = f"""以下は「{analysis.ronten_title}」（法制審議会論点）に関連する意見です。
 この論点について、意見を簡潔に要約してください（3-4文）。
 
 ## 関連意見
@@ -378,160 +388,148 @@ async def _run_pipeline(
 - 具体的な内容を優先してください
 - 100字程度で要約してください
 """
-                        try:
-                            summary_response = await llm_client.generate(summary_prompt)
-                            summary_text = summary_response[:300]
-                        except Exception:
-                            summary_text = f"{analysis.opinion_count}件の関連意見があります。"
+                            try:
+                                summary_response = await llm_client.generate(summary_prompt)
+                                summary_text = summary_response[:300]
+                            except Exception:
+                                summary_text = f"{analysis.opinion_count}件の関連意見があります。"
+                            
+                            # Collect session IDs from opinions
+                            session_ids = []
+                            for op in all_opinions:
+                                # From cluster opinions
+                                if op.get("session_ids"):
+                                    session_ids.extend(op.get("session_ids", []))
+                                # From minority opinions
+                                if op.get("session_id"):
+                                    session_ids.append(op.get("session_id"))
+                            # Deduplicate and limit
+                            unique_session_ids = list(dict.fromkeys(session_ids))[:5]
+                            
+                            ronten_summaries.append(RontenSummary(
+                                ronten_id=analysis.ronten_id,
+                                ronten_title=analysis.ronten_title,
+                                opinion_count=analysis.opinion_count,
+                                summary=summary_text,
+                                supporting_points=[
+                                    op.get("content", "")[:150] for op in analysis.supporting_opinions[:3]
+                                ],
+                                concern_points=[
+                                    op.get("content", "")[:150] for op in analysis.concerns[:3]
+                                ],
+                                expert_points=[
+                                    op.get("content", "")[:150] for op in analysis.expert_opinions[:3]
+                                ],
+                                representative_quotes=[
+                                    op.get("content", "")[:200] for op in all_opinions[:2]
+                                ],
+                                representative_session_ids=unique_session_ids,
+                            ))
+                    
+                    # Create novel insights
+                    for op in novel_opinions[:5]:  # Limit to top 5
+                        match_data = op.get("ronten_match", {})
+                        # Enhanced session_id retrieval
+                        session_id = op.get("session_id")
+                        if not session_id and op.get("session_ids"):
+                            session_id = op.get("session_ids")[0]
                         
-                        # Collect session IDs from opinions
-                        session_ids = []
-                        for op in all_opinions:
-                            # From cluster opinions
-                            if op.get("session_ids"):
-                                session_ids.extend(op.get("session_ids", []))
-                            # From minority opinions
-                            if op.get("session_id"):
-                                session_ids.append(op.get("session_id"))
-                        # Deduplicate and limit
-                        unique_session_ids = list(dict.fromkeys(session_ids))[:5]
-                        
-                        ronten_summaries.append(RontenSummary(
-                            ronten_id=analysis.ronten_id,
-                            ronten_title=analysis.ronten_title,
-                            opinion_count=analysis.opinion_count,
-                            summary=summary_text,
-                            supporting_points=[
-                                op.get("content", "")[:150] for op in analysis.supporting_opinions[:3]
-                            ],
-                            concern_points=[
-                                op.get("content", "")[:150] for op in analysis.concerns[:3]
-                            ],
-                            expert_points=[
-                                op.get("content", "")[:150] for op in analysis.expert_opinions[:3]
-                            ],
-                            representative_quotes=[
-                                op.get("content", "")[:200] for op in all_opinions[:2]
-                            ],
-                            representative_session_ids=unique_session_ids,
+                        novel_insights.append(NovelInsight(
+                            content=op.get("content", ""),
+                            session_id=session_id or "",
+                            insight_type=match_data.get("insight_type", "general"),
+                            summary=match_data.get("summary", "新規論点"),
                         ))
+                    
+                    progress.update(task, completed=True)
                 
-                # Create novel insights
-                for op in novel_opinions[:5]:  # Limit to top 5
-                    match_data = op.get("ronten_match", {})
-                    novel_insights.append(NovelInsight(
-                        content=op.get("content", ""),
-                        session_id=op.get("session_id", ""),
-                        insight_type=match_data.get("insight_type", "general"),
-                        summary=match_data.get("summary", "新規論点"),
-                    ))
+                # Generate overall summary
+                overall_summarizer = OverallSummarizer(settings, llm_client)
                 
-                progress.update(task, completed=True)
-            
-            # Generate overall summary
-            overall_summarizer = OverallSummarizer(settings, llm_client)
-            
-            if multi_llm:
-                # Use Multi-LLM consensus for overall summary
-                task = progress.add_task("[cyan]Generating overall summary (Multi-LLM)...", total=None)
-                orchestrator = MultiLLMOrchestrator(settings)
-                
-                overall_summary, multi_llm_result = await overall_summarizer.generate_summary_multi_llm(
-                    orchestrator=orchestrator,
-                survey_title=extraction_result.survey_title,
-                total_responses=extraction_result.response_count,
-                date_range=extraction_result.date_range,
-                stance_distribution=stance_distribution,
-                cluster_summaries=cluster_summaries,
-                minority_opinions=minorities,
-                    ronten_context=ronten_context,
-                )
-                
-                # Save Multi-LLM outputs
-                output_files = save_multi_llm_outputs(
-                    multi_llm_result,
-                    output_dir,
-                    extraction_result.survey_title
-                )
-                
-                progress.update(task, completed=True)
-                console.print(f"  ✓ Multi-LLM agreement score: {multi_llm_result.agreement_score:.2f}")
-                console.print(f"  ✓ Saved Multi-LLM logs to {output_dir}/multi_llm/")
-                
-                # Add ronten analysis to overall summary
-                overall_summary.ronten_summaries = ronten_summaries
-                overall_summary.novel_insights = novel_insights
-            else:
-                # Use single LLM for overall summary
-                task = progress.add_task("[cyan]Generating overall summary...", total=None)
-                overall_summary = await overall_summarizer.generate_summary(
+                if multi_llm:
+                    # Use Multi-LLM consensus for overall summary
+                    task = progress.add_task("[cyan]Generating overall summary (Multi-LLM)...", total=None)
+                    orchestrator = MultiLLMOrchestrator(settings)
+                    
+                    overall_summary, multi_llm_result = await overall_summarizer.generate_summary_multi_llm(
+                        orchestrator=orchestrator,
                     survey_title=extraction_result.survey_title,
                     total_responses=extraction_result.response_count,
                     date_range=extraction_result.date_range,
                     stance_distribution=stance_distribution,
                     cluster_summaries=cluster_summaries,
                     minority_opinions=minorities,
-                    ronten_context=ronten_context,
-                )
-                progress.update(task, completed=True)
+                        ronten_context=ronten_context,
+                    )
+                    
+                    # Save Multi-LLM outputs
+                    output_files = save_multi_llm_outputs(
+                        multi_llm_result,
+                        output_dir,
+                        extraction_result.survey_title
+                    )
+                    
+                    progress.update(task, completed=True)
+                    console.print(f"  ✓ Multi-LLM agreement score: {multi_llm_result.agreement_score:.2f}")
+                    console.print(f"  ✓ Saved Multi-LLM logs to {output_dir}/multi_llm/")
+                    
+                    # Add ronten analysis to overall summary
+                    overall_summary.ronten_summaries = ronten_summaries
+                    overall_summary.novel_insights = novel_insights
+                else:
+                    # Use single LLM for overall summary
+                    task = progress.add_task("[cyan]Generating overall summary...", total=None)
+                    overall_summary = await overall_summarizer.generate_summary(
+                        survey_title=extraction_result.survey_title,
+                        total_responses=extraction_result.response_count,
+                        date_range=extraction_result.date_range,
+                        stance_distribution=stance_distribution,
+                        cluster_summaries=cluster_summaries,
+                        minority_opinions=minorities,
+                        ronten_context=ronten_context,
+                    )
+                    progress.update(task, completed=True)
+                    
+                    # Add ronten analysis to overall summary
+                    overall_summary.ronten_summaries = ronten_summaries
+                    overall_summary.novel_insights = novel_insights
                 
-                # Add ronten analysis to overall summary
-                overall_summary.ronten_summaries = ronten_summaries
-                overall_summary.novel_insights = novel_insights
+                # Persona analysis
+                persona_result = None
+                if persona:
+                    task = progress.add_task("[cyan]Running persona analysis...", total=None)
+                    persona_assembly = PersonaAssembly(settings, llm_client)
+                    
+                    # Prepare content for persona analysis
+                    content = f"""
+    ## アンケート分析結果
+
+    ### 基本情報
+    - タイトル: {extraction_result.survey_title}
+    - 総回答数: {extraction_result.response_count}
+
+    ### 主要な発見
+    {chr(10).join(f"- {f}" for f in overall_summary.key_findings[:5])}
+
+    ### 合意点
+    {chr(10).join(f"- {p}" for p in overall_summary.consensus_points[:3])}
+
+    ### 対立点
+    {chr(10).join(f"- {p}" for p in overall_summary.disagreement_points[:3])}
+
+    ### マイノリティ意見
+    {chr(10).join(f"- {m.content[:100]}..." for m in minorities[:3])}
+    """
+                    persona_result = await persona_assembly.assemble_analysis(content)
+                    progress.update(task, completed=True)
+                    console.print(f"  ✓ Persona analysis completed ({len(persona_result.individual_analyses)} perspectives)")
             
-            # Persona analysis
-            persona_result = None
-            if persona:
-                task = progress.add_task("[cyan]Running persona analysis...", total=None)
-                persona_assembly = PersonaAssembly(settings, llm_client)
-                
-                # Prepare content for persona analysis
-                content = f"""
-## アンケート分析結果
-
-### 基本情報
-- タイトル: {extraction_result.survey_title}
-- 総回答数: {extraction_result.response_count}
-
-### 主要な発見
-{chr(10).join(f"- {f}" for f in overall_summary.key_findings[:5])}
-
-### 合意点
-{chr(10).join(f"- {p}" for p in overall_summary.consensus_points[:3])}
-
-### 対立点
-{chr(10).join(f"- {p}" for p in overall_summary.disagreement_points[:3])}
-
-### マイノリティ意見
-{chr(10).join(f"- {m.content[:100]}..." for m in minorities[:3])}
-"""
-                persona_result = await persona_assembly.assemble_analysis(content)
-                progress.update(task, completed=True)
-                console.print(f"  ✓ Persona analysis completed ({len(persona_result.individual_analyses)} perspectives)")
-        
-        # Phase 4: Generate outputs
-        # Get token usage from shared LLM client
-        token_usage = llm_client.get_usage_summary()
-        
-        # Aggregate Multi-LLM token usage if available
-        if multi_llm_result:
-            for resp in multi_llm_result.individual_responses:
-                if resp.tokens_used > 0:
-                    model_name = resp.model
-                    if model_name not in token_usage["by_model"]:
-                        token_usage["by_model"][model_name] = {
-                            "prompt": 0,
-                            "completion": 0,
-                            "total": 0,
-                            "calls": 0
-                        }
-                    token_usage["by_model"][model_name]["total"] += resp.tokens_used
-                    token_usage["by_model"][model_name]["calls"] += 1
-                    token_usage["total_tokens"] += resp.tokens_used
+            # Phase 4: Generate outputs
+            token_usage = llm_client.get_usage_summary()  # Get token usage
             
-            # Also aggregate from discussion rounds
-            for round_data in multi_llm_result.discussion_rounds:
-                for resp in round_data.responses:
+            # Aggregate Multi-LLM token usage if available
+            if multi_llm_result:
+                for resp in multi_llm_result.individual_responses:
                     if resp.tokens_used > 0:
                         model_name = resp.model
                         if model_name not in token_usage["by_model"]:
@@ -541,121 +539,140 @@ async def _run_pipeline(
                                 "total": 0,
                                 "calls": 0
                             }
+                        # Multi-LLM only tracks total tokens, estimate split
                         token_usage["by_model"][model_name]["total"] += resp.tokens_used
                         token_usage["by_model"][model_name]["calls"] += 1
                         token_usage["total_tokens"] += resp.tokens_used
-        
-        if overall_summary:
-            task = progress.add_task("[cyan]Generating report...", total=None)
-            report_generator = ReportGenerator(settings)
+                
+                # Also aggregate from discussion rounds
+                for round_data in multi_llm_result.discussion_rounds:
+                    for resp in round_data.responses:
+                        if resp.tokens_used > 0:
+                            model_name = resp.model
+                            if model_name not in token_usage["by_model"]:
+                                token_usage["by_model"][model_name] = {
+                                    "prompt": 0,
+                                    "completion": 0,
+                                    "total": 0,
+                                    "calls": 0
+                                }
+                            token_usage["by_model"][model_name]["total"] += resp.tokens_used
+                            token_usage["by_model"][model_name]["calls"] += 1
+                            token_usage["total_tokens"] += resp.tokens_used
 
-            report_data = ReportData(
-                overall_summary=overall_summary,
-                persona_analysis=persona_result.to_dict() if persona_result else None,
-                multi_llm_consensus=multi_llm_result.to_dict() if multi_llm_result else None,
-                filter_stats=filter_stats.to_dict() if filter_stats else None,
-                token_usage=token_usage,
-            )
+            if overall_summary:
+                task = progress.add_task("[cyan]Generating report...", total=None)
+                report_generator = ReportGenerator(settings)
+                
+                report_data = ReportData(
+                    overall_summary=overall_summary,
+                    persona_analysis=persona_result.to_dict() if persona_result else None,
+                    multi_llm_consensus=multi_llm_result.to_dict() if multi_llm_result else None,
+                    filter_stats=filter_stats.to_dict() if filter_stats else None,
+                    token_usage=token_usage,
+                )
+                
+                outputs = report_generator.save_report(
+                    report_data,
+                    output_dir,
+                    formats=['md', 'html'],
+                    compact=compact,
+                )
+                progress.update(task, completed=True)
+                
+                for fmt, path in outputs.items():
+                    console.print(f"  ✓ Saved {fmt}: {path}")
             
-            outputs = report_generator.save_report(
-                report_data,
-                output_dir,
-                formats=['md', 'html'],
-            )
-            progress.update(task, completed=True)
+            # Build cluster details for visualization (use all clusters for full picture)
+            import json
             
-            for fmt, path in outputs.items():
-                console.print(f"  ✓ Saved {fmt}: {path}")
-        
-        # Build cluster details for visualization (use all clusters for full picture)
-        import json
-        
-        cluster_details = []
-        for c in clusters_all:
-            cluster_details.append({
-                "cluster_id": int(c.cluster_id),  # Convert numpy int64 to Python int
-                "label": c.label,
-                "size": int(c.size),
-                "keywords": c.keywords,
-                "sample_responses": [r.content[:200] for r in c.responses[:3]],
-                "included_in_report": c.size >= settings.min_cluster_size_for_report,
-            })
-        
-        # Sort by size descending
-        cluster_details.sort(key=lambda x: x['size'], reverse=True)
-        
-        # Charts
-        if not skip_charts:
-            task = progress.add_task("[cyan]Generating charts...", total=None)
-            chart_generator = ChartGenerator(settings)
+            cluster_details = []
+            for c in clusters_all:
+                cluster_details.append({
+                    "cluster_id": int(c.cluster_id),  # Convert numpy int64 to Python int
+                    "label": c.label,
+                    "size": int(c.size),
+                    "keywords": c.keywords,
+                    "sample_responses": [r.content[:200] for r in c.responses[:3]],
+                    "included_in_report": c.size >= settings.min_cluster_size_for_report,
+                })
             
-            analysis_results = {
-                'stance_distribution': stance_distribution,
-                'cluster_summaries': [cs.to_dict() for cs in cluster_summaries] if cluster_summaries else [],
-                'cluster_details': cluster_details,
-                'response_texts': [r.content for r in filtered_responses],
-            }
+            # Sort by size descending
+            cluster_details.sort(key=lambda x: x['size'], reverse=True)
             
-            chart_outputs = chart_generator.generate_all_charts(
-                analysis_results,
-                output_dir,
-            )
-            progress.update(task, completed=True)
-            
-            for name, path in chart_outputs.items():
-                console.print(f"  ✓ Chart: {path}")
-        
-        # RAG Index
-        if not skip_index and overall_summary:
-            task = progress.add_task("[cyan]Building RAG index...", total=None)
-            index_builder = IndexBuilder(settings)
-            
-            report_content = report_generator.generate_markdown(report_data) if overall_summary else ""
-            
-            index_path = index_builder.build_index(
-                survey_slug=survey_slug,
-                responses=extraction_result.responses,
-                report_content=report_content,
-                cluster_summaries=[cs.to_dict() for cs in cluster_summaries],
-                output_dir=output_dir,
-            )
-            progress.update(task, completed=True)
-            console.print(f"  ✓ Index: {index_path}")
-        
-        analysis_data = {
-            "survey_slug": survey_slug,
-            "survey_title": extraction_result.survey_title,
-            "generated_at": datetime.now().isoformat(),
-            "response_count": extraction_result.response_count,
-            "stance_distribution": stance_distribution,
-            "cluster_count": len(clusters_all),
-            "cluster_count_in_report": len(clusters),
-            "min_cluster_size_for_report": settings.min_cluster_size_for_report,
-            "cluster_details": cluster_details,
-            "minority_count": len(minorities),
-            "minority_opinions": [
-                {
-                    "content": m.content[:300],
-                    "outlier_score": m.outlier_score,
-                    "uniqueness_reason": m.uniqueness_reason,
-                    "unique_keywords": m.unique_keywords[:5] if m.unique_keywords else [],
+            # Charts
+            if not skip_charts:
+                task = progress.add_task("[cyan]Generating charts...", total=None)
+                chart_generator = ChartGenerator(settings)
+                
+                analysis_results = {
+                    'stance_distribution': stance_distribution,
+                    'cluster_summaries': [cs.to_dict() for cs in cluster_summaries] if cluster_summaries else [],
+                    'cluster_details': cluster_details,
+                    'response_texts': [r.content for r in filtered_responses],
                 }
-                for m in minorities[:20]  # Top 20 minorities
-            ],
-            "token_usage": token_usage,
-            "settings": {
-                "provider": settings.llm_provider.value,
-                "multi_llm": multi_llm,
-                "persona": persona,
+                
+                chart_outputs = chart_generator.generate_all_charts(
+                    analysis_results,
+                    output_dir,
+                )
+                progress.update(task, completed=True)
+                
+                for name, path in chart_outputs.items():
+                    console.print(f"  ✓ Chart: {path}")
+            
+            # RAG Index
+            if not skip_index and overall_summary:
+                task = progress.add_task("[cyan]Building RAG index...", total=None)
+                index_builder = IndexBuilder(settings)
+                
+                report_content = report_generator.generate_markdown(report_data) if overall_summary else ""
+                
+                index_path = index_builder.build_index(
+                    survey_slug=survey_slug,
+                    responses=extraction_result.responses,
+                    report_content=report_content,
+                    cluster_summaries=[cs.to_dict() for cs in cluster_summaries],
+                    output_dir=output_dir,
+                )
+                progress.update(task, completed=True)
+                console.print(f"  ✓ Index: {index_path}")
+            
+            analysis_data = {
+                "survey_slug": survey_slug,
+                "survey_title": extraction_result.survey_title,
+                "generated_at": datetime.now().isoformat(),
+                "response_count": extraction_result.response_count,
+                "stance_distribution": stance_distribution,
+                "cluster_count": len(clusters_all),
+                "cluster_count_in_report": len(clusters),
+                "min_cluster_size_for_report": settings.min_cluster_size_for_report,
+                "cluster_details": cluster_details,
+                "minority_count": len(minorities),
+                "minority_opinions": [
+                    {
+                        "content": m.content[:300],
+                        "outlier_score": m.outlier_score,
+                        "uniqueness_reason": m.uniqueness_reason,
+                        "unique_keywords": m.unique_keywords[:5] if m.unique_keywords else [],
+                    }
+                    for m in minorities[:20]  # Top 20 minorities (for data file)
+                ],
+                "token_usage": token_usage,
+                "settings": {
+                    "provider": settings.llm_provider.value,
+                    "multi_llm": multi_llm,
+                    "persona": persona,
+                    "compact": compact,
+                }
             }
-        }
-        
-        data_path = output_dir / "analysis_data.json"
-        with open(data_path, 'w', encoding='utf-8') as f:
-            json.dump(analysis_data, f, ensure_ascii=False, indent=2)
-        
-        console.print(f"\n[bold green]✓ Analysis complete![/bold green]")
-        console.print(f"Output directory: {output_dir}")
+            
+            data_path = output_dir / "analysis_data.json"
+            with open(data_path, 'w', encoding='utf-8') as f:
+                json.dump(analysis_data, f, ensure_ascii=False, indent=2)
+            
+            console.print(f"\n[bold green]✓ Analysis complete![/bold green]")
+            console.print(f"Output directory: {output_dir}")
     
     finally:
         # Close shared LLM client
@@ -698,6 +715,7 @@ def batch(
                 settings=get_settings_with_provider(provider or job.get('provider')),
                 multi_llm=job.get('multi_llm', False),
                 persona=job.get('persona', False),
+                compact=job.get('compact', False),
                 skip_summarization=job.get('skip_summarization', False),
                 skip_charts=job.get('skip_charts', False),
                 skip_index=job.get('skip_index', False),
@@ -957,4 +975,3 @@ def serve_index(
 
 if __name__ == "__main__":
     app()
-

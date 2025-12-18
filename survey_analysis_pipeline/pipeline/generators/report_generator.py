@@ -11,12 +11,20 @@ from config.settings import Settings, get_settings
 from pipeline.summarizers.overall_summarizer import OverallSummary
 
 
+WEB_UI_SECTION = """
+## 🌐 対話型分析ツール
+
+このレポートはWeb UIでも閲覧できます:
+- **レポートビューア**: [survey_rag_app](../survey_rag_app/index.html)
+- **元インタビューデータ**: https://depth-interview-ai.vercel.app/
+"""
+
 REPORT_TEMPLATE = """# {{ survey_title }} - 分析レポート
 
 **生成日時**: {{ generated_at }}  
 **分析対象期間**: {{ date_range }}  
 **総回答数**: {{ total_responses }}件
-
+""" + WEB_UI_SECTION + """
 ---
 
 <a id="toc"></a>
@@ -318,6 +326,7 @@ REPORT_TEMPLATE = """# {{ survey_title }} - 分析レポート
 ---
 {% endif %}
 
+{% if show_quality_scores %}
 <a id="quality-legend"></a>
 
 ## 📊 質的スコア凡例
@@ -329,10 +338,12 @@ REPORT_TEMPLATE = """# {{ survey_title }} - 分析レポート
 | **専門性** | 実務経験・業界用語・具体的事例の有無 | 40% |
 | **具体性** | 数字・データ・ケーススタディの含有 | 30% |
 | **新規性** | 他クラスタにない独自の視点 | 30% |
+| **政策的価値** | 政策立案・法案修正への貢献度 | - |
 
 > 質的スコアが高い意見は、回答数が少なくても政策検討において重要な示唆を含む可能性があります。
 
 ---
+{% endif %}
 
 <a id="cluster-analysis"></a>
 
@@ -341,13 +352,17 @@ REPORT_TEMPLATE = """# {{ survey_title }} - 分析レポート
 {% for cluster in cluster_summaries %}
 ### 「{{ cluster.cluster_label }}」 ({{ cluster.response_count }}件)
 
-{% if cluster.quality_score %}
+{% if cluster.quality_score and show_quality_scores %}
 **質的スコア**: {% for i in range(5) %}{% if cluster.quality_score.combined_score >= (i+1)*0.2 %}★{% else %}☆{% endif %}{% endfor %} ({{ "%.2f"|format(cluster.quality_score.combined_score) }})
 - 専門性: {{ "%.2f"|format(cluster.quality_score.expertise_score) }}{% if cluster.quality_score.expertise_reasoning %} - {{ cluster.quality_score.expertise_reasoning }}{% endif %}
 
 - 具体性: {{ "%.2f"|format(cluster.quality_score.specificity_score) }}{% if cluster.quality_score.specificity_reasoning %} - {{ cluster.quality_score.specificity_reasoning }}{% endif %}
 
 - 新規性: {{ "%.2f"|format(cluster.quality_score.novelty_score) }}{% if cluster.quality_score.novelty_reasoning %} - {{ cluster.quality_score.novelty_reasoning }}{% endif %}
+
+{% if cluster.quality_score.policy_relevance_score is defined %}
+- **政策的価値**: {{ "%.2f"|format(cluster.quality_score.policy_relevance_score) }}
+{% endif %}
 
 {% endif %}
 
@@ -482,6 +497,111 @@ REPORT_TEMPLATE = """# {{ survey_title }} - 分析レポート
 *このレポートは自動生成されました。生成日時: {{ generated_at }}*
 """
 
+COMPACT_REPORT_TEMPLATE = """# {{ survey_title }} - 政策者向けサマリーレポート
+
+**生成日時**: {{ generated_at }}  
+**総回答数**: {{ total_responses }}件
+""" + WEB_UI_SECTION + """
+---
+
+## 📑 目次
+
+- [エグゼクティブサマリー](#executive-summary)
+- [主要な発見事項](#key-findings)
+- [推奨アクション](#recommended-actions)
+- [論点別分析（主要論点）](#ronten-analysis)
+- [重要な新規視点](#novel-insights)
+- [主要な意見グループ](#cluster-analysis)
+
+---
+
+<a id="executive-summary"></a>
+## エグゼクティブサマリー
+
+{{ executive_summary }}
+
+---
+
+<a id="key-findings"></a>
+## 主要な発見事項
+
+{% for finding in key_findings -%}
+{{ loop.index }}. {{ finding }}
+{% endfor %}
+
+---
+
+<a id="recommended-actions"></a>
+## 📋 推奨アクション
+
+{% for action in recommended_actions -%}
+{{ loop.index }}. {{ action }}
+{% endfor %}
+
+---
+
+{% if multi_llm_consensus %}
+## 🤖 Multi-LLM 合意形成結果（要約）
+
+**合意スコア**: {{ "%.1f"|format(multi_llm_consensus.agreement_score * 100) }}%
+
+{{ multi_llm_consensus.consensus_content }}
+{% endif %}
+
+---
+
+<a id="ronten-analysis"></a>
+## 📋 論点別分析（ハイライト）
+
+{% for ronten in ronten_summaries %}
+### {{ loop.index }}. {{ ronten.ronten_title }}
+{{ ronten.summary }}
+
+{% if ronten.expert_points %}
+**💡 専門家・当事者の指摘**:
+{% for point in ronten.expert_points[:2] -%}
+- {{ point }}
+{% endfor %}
+{% endif %}
+{% endfor %}
+
+---
+
+{% if novel_insights %}
+<a id="novel-insights"></a>
+## 💡 重要な新規視点
+
+{% for insight in novel_insights[:3] %}
+### {{ loop.index }}. {{ insight.summary }}
+{{ insight.content[:200] }}...
+{% endfor %}
+{% endif %}
+
+---
+
+<a id="cluster-analysis"></a>
+## 主要な意見グループ（上位{{ cluster_summaries|length }}件）
+
+{% for cluster in cluster_summaries %}
+### {{ loop.index }}. 「{{ cluster.cluster_label }}」 ({{ cluster.response_count }}件)
+
+**主張**: {{ cluster.group_assertion }}
+
+{% if cluster.quality_score and show_quality_scores %}
+**質的評価**: 総合 {{ "%.2f"|format(cluster.quality_score.combined_score) }} (専門性: {{ "%.1f"|format(cluster.quality_score.expertise_score) }}{% if cluster.quality_score.policy_relevance_score is defined %}, 政策価値: {{ "%.1f"|format(cluster.quality_score.policy_relevance_score) }}{% endif %})
+{% endif %}
+
+> 代表意見: "{{ cluster.representative_quote[:100] }}..."
+
+{% endfor %}
+
+---
+
+## 🔍 付録・詳細データ
+
+より詳細な分析データ（全クラスタ詳細、マイノリティ意見全量、技術的な質的スコア内訳など）は、フルバージョンのレポートまたはWeb UIを参照してください。
+"""
+
 
 @dataclass
 class ReportData:
@@ -504,26 +624,25 @@ class ReportGenerator:
         """
         self.settings = settings or get_settings()
         self.template = Template(REPORT_TEMPLATE)
+        self.compact_template = Template(COMPACT_REPORT_TEMPLATE)
     
     def generate_markdown(
         self,
         data: ReportData,
+        compact: bool = False,
     ) -> str:
         """Generate Markdown report.
         
         Args:
             data: Report data
+            compact: Whether to generate compact report
             
         Returns:
             Markdown string
         """
         summary = data.overall_summary
         
-        # Sort cluster summaries
-        # If quality scoring is enabled and sort is requested, sort by quality score
-        # Otherwise sort by response_count
-        
-        # Determine sorting method
+        # Determine sorting method for clusters
         if (self.settings.quality_scoring_enabled and 
             self.settings.quality_score_sort_clusters and 
             any(cs.quality_score for cs in summary.cluster_summaries)):
@@ -545,6 +664,24 @@ class ReportGenerator:
                 key=lambda cs: cs.response_count,
                 reverse=True
             )
+            
+        # Determine template and data limits based on compact flag
+        # Use compact flag passed via argument OR settings
+        is_compact = compact or self.settings.compact_report_enabled
+        
+        # Limit clusters for standard report as well (based on new settings)
+        max_clusters = self.settings.compact_max_clusters if is_compact else self.settings.report_max_clusters
+        display_clusters = sorted_clusters[:max_clusters]
+        
+        # Limit minorities if compact
+        display_minorities = summary.minority_opinions
+        if is_compact:
+            display_minorities = summary.minority_opinions[:self.settings.compact_max_minorities]
+        
+        if is_compact:
+            template = self.compact_template
+        else:
+            template = self.template
         
         context = {
             "survey_title": summary.survey_title,
@@ -554,10 +691,10 @@ class ReportGenerator:
             "executive_summary": summary.executive_summary,
             "stance_distribution": summary.stance_distribution,
             "key_findings": summary.key_findings or [],
-            "cluster_summaries": [cs.to_dict() for cs in sorted_clusters],
+            "cluster_summaries": [cs.to_dict() for cs in display_clusters],
             "consensus_points": summary.consensus_points,
             "disagreement_points": summary.disagreement_points,
-            "minority_opinions": [mo.to_dict() for mo in summary.minority_opinions],
+            "minority_opinions": [mo.to_dict() for mo in display_minorities],
             # Recommended actions and caveats
             "recommended_actions": summary.recommended_actions or [],
             "caveats": summary.caveats or [],
@@ -576,24 +713,26 @@ class ReportGenerator:
             "token_usage": data.token_usage,
             "show_quality_scores": self.settings.report_show_quality_scores,
         }
-
-        return self.template.render(**context)
+        
+        return template.render(**context)
     
     def generate_html(
         self,
         data: ReportData,
+        compact: bool = False,
     ) -> str:
         """Generate HTML report.
         
         Args:
             data: Report data
+            compact: Whether to generate compact report
             
         Returns:
             HTML string
         """
         import markdown
         
-        md_content = self.generate_markdown(data)
+        md_content = self.generate_markdown(data, compact=compact)
         
         # Convert to HTML
         html_body = markdown.markdown(
@@ -693,6 +832,7 @@ class ReportGenerator:
         data: ReportData,
         output_dir: Path,
         formats: list = None,
+        compact: bool = False,
     ) -> Dict[str, Path]:
         """Save report in specified formats.
         
@@ -700,6 +840,7 @@ class ReportGenerator:
             data: Report data
             output_dir: Output directory
             formats: List of formats ('md', 'html')
+            compact: Whether to generate compact report
             
         Returns:
             Dictionary mapping format to output path
@@ -710,14 +851,14 @@ class ReportGenerator:
         outputs = {}
         
         if 'md' in formats:
-            md_content = self.generate_markdown(data)
-            md_path = output_dir / "report.md"
+            md_content = self.generate_markdown(data, compact=compact)
+            md_path = output_dir / ("report_summary.md" if compact else "report.md")
             md_path.write_text(md_content, encoding='utf-8')
             outputs['md'] = md_path
         
         if 'html' in formats:
-            html_content = self.generate_html(data)
-            html_path = output_dir / "report.html"
+            html_content = self.generate_html(data, compact=compact)
+            html_path = output_dir / ("report_summary.html" if compact else "report.html")
             html_path.write_text(html_content, encoding='utf-8')
             outputs['html'] = html_path
         

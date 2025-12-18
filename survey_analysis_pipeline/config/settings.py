@@ -188,6 +188,10 @@ class Settings(BaseSettings):
         default=0.3,
         description="Weight for novelty score"
     )
+    quality_score_weight_policy: float = Field(
+        default=0.3,
+        description="Weight for policy relevance score"
+    )
     quality_score_sort_clusters: bool = Field(
         default=True,
         description="Sort clusters by quality score in report"
@@ -202,7 +206,25 @@ class Settings(BaseSettings):
         default=False,
         description="Show detailed quality scores in standard report"
     )
-
+    
+    # Compact Report Settings
+    compact_report_enabled: bool = Field(
+        default=False,
+        description="Enable compact report generation (10-15 pages)"
+    )
+    compact_max_clusters: int = Field(
+        default=5,
+        description="Maximum number of top clusters to show in compact report"
+    )
+    compact_max_minorities: int = Field(
+        default=3,
+        description="Maximum number of minority opinions to show in compact report"
+    )
+    show_detailed_scores_in_appendix: bool = Field(
+        default=True,
+        description="Move detailed scores to appendix in compact report"
+    )
+    
     # Cache Settings
     cache_enabled: bool = Field(
         default=True,
@@ -242,4 +264,3 @@ class Settings(BaseSettings):
 def get_settings() -> Settings:
     """Get cached settings instance."""
     return Settings()
-

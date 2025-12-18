@@ -137,6 +137,8 @@ class LLMClient:
             cache_key = self._get_cache_key(messages, temperature=temp, max_tokens=tokens)
             cached = self._cache.get(cache_key)
             if cached is not None:
+                # Note: Cached responses don't add to token usage stats for now
+                # We could store usage in cache too if needed
                 return cached
         
         # Prepare kwargs
@@ -250,4 +252,3 @@ class LLMClient:
 def get_llm_client() -> LLMClient:
     """Get cached LLM client instance."""
     return LLMClient()
-
