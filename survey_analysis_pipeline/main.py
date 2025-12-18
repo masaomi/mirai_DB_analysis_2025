@@ -166,7 +166,11 @@ async def _run_pipeline(
 ):
     """Run the analysis pipeline."""
     
-    with Progress(
+    # Initialize shared LLM client for token tracking
+    llm_client = LLMClient(settings)
+    
+    try:
+        with Progress(
         SpinnerColumn(),
         TextColumn("[progress.description]{task.description}"),
         console=console,
@@ -202,7 +206,6 @@ async def _run_pipeline(
         
         if settings.relevance_filter_enabled:
             task = progress.add_task("[cyan]Filtering clusters by relevance...", total=None)
-            llm_client = LLMClient(settings)
             cluster_filter = ClusterBasedFilter(settings, llm_client)
             
             clusters, filter_results, filter_stats = await cluster_filter.filter_clusters(
@@ -277,8 +280,6 @@ async def _run_pipeline(
         multi_llm_result = None
         
         if not skip_summarization:
-            llm_client = LLMClient(settings)
-            
             # Filter minority opinions by relevance if enabled
             if settings.minority_relevance_check and minorities:
                 task = progress.add_task("[cyan]Filtering minority opinions by relevance...", total=None)
@@ -509,15 +510,51 @@ async def _run_pipeline(
                 console.print(f"  ✓ Persona analysis completed ({len(persona_result.individual_analyses)} perspectives)")
         
         # Phase 4: Generate outputs
+        # Get token usage from shared LLM client
+        token_usage = llm_client.get_usage_summary()
+        
+        # Aggregate Multi-LLM token usage if available
+        if multi_llm_result:
+            for resp in multi_llm_result.individual_responses:
+                if resp.tokens_used > 0:
+                    model_name = resp.model
+                    if model_name not in token_usage["by_model"]:
+                        token_usage["by_model"][model_name] = {
+                            "prompt": 0,
+                            "completion": 0,
+                            "total": 0,
+                            "calls": 0
+                        }
+                    token_usage["by_model"][model_name]["total"] += resp.tokens_used
+                    token_usage["by_model"][model_name]["calls"] += 1
+                    token_usage["total_tokens"] += resp.tokens_used
+            
+            # Also aggregate from discussion rounds
+            for round_data in multi_llm_result.discussion_rounds:
+                for resp in round_data.responses:
+                    if resp.tokens_used > 0:
+                        model_name = resp.model
+                        if model_name not in token_usage["by_model"]:
+                            token_usage["by_model"][model_name] = {
+                                "prompt": 0,
+                                "completion": 0,
+                                "total": 0,
+                                "calls": 0
+                            }
+                        token_usage["by_model"][model_name]["total"] += resp.tokens_used
+                        token_usage["by_model"][model_name]["calls"] += 1
+                        token_usage["total_tokens"] += resp.tokens_used
+        
         if overall_summary:
             task = progress.add_task("[cyan]Generating report...", total=None)
             report_generator = ReportGenerator(settings)
-            
+
             report_data = ReportData(
                 overall_summary=overall_summary,
                 persona_analysis=persona_result.to_dict() if persona_result else None,
                 multi_llm_consensus=multi_llm_result.to_dict() if multi_llm_result else None,
                 filter_stats=filter_stats.to_dict() if filter_stats else None,
+                token_usage=token_usage,
             )
             
             outputs = report_generator.save_report(
@@ -605,6 +642,7 @@ async def _run_pipeline(
                 }
                 for m in minorities[:20]  # Top 20 minorities
             ],
+            "token_usage": token_usage,
             "settings": {
                 "provider": settings.llm_provider.value,
                 "multi_llm": multi_llm,
@@ -618,6 +656,10 @@ async def _run_pipeline(
         
         console.print(f"\n[bold green]✓ Analysis complete![/bold green]")
         console.print(f"Output directory: {output_dir}")
+    
+    finally:
+        # Close shared LLM client
+        llm_client.close()
 
 
 @app.command()

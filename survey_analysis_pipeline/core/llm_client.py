@@ -3,11 +3,21 @@
 import asyncio
 from typing import Optional, List, Dict, Any
 from functools import lru_cache
+from dataclasses import dataclass
 
 import litellm
 from diskcache import Cache
 
 from config.settings import Settings, get_settings, LLMProvider
+
+
+@dataclass
+class TokenUsage:
+    """Token usage statistics for a single call."""
+    model: str
+    prompt_tokens: int
+    completion_tokens: int
+    total_tokens: int
 
 
 class LLMClient:
@@ -28,6 +38,9 @@ class LLMClient:
             cache_dir = self.settings.cache_dir
             cache_dir.mkdir(parents=True, exist_ok=True)
             self._cache = Cache(str(cache_dir / "llm_cache"))
+            
+        # Token usage tracking
+        self.token_usage: List[TokenUsage] = []
     
     def _setup_provider(self) -> None:
         """Setup LLM provider configuration."""
@@ -147,6 +160,15 @@ class LLMClient:
             response = await litellm.acompletion(**kwargs)
             result = response.choices[0].message.content
             
+            # Track token usage
+            if hasattr(response, 'usage') and response.usage:
+                self.token_usage.append(TokenUsage(
+                    model=kwargs["model"],
+                    prompt_tokens=response.usage.prompt_tokens,
+                    completion_tokens=response.usage.completion_tokens,
+                    total_tokens=response.usage.total_tokens,
+                ))
+            
             # Cache result
             if use_cache and self._cache is not None:
                 self._cache.set(cache_key, result, expire=86400)  # 24 hour cache
@@ -155,6 +177,36 @@ class LLMClient:
             
         except Exception as e:
             raise RuntimeError(f"LLM call failed: {e}") from e
+    
+    def get_usage_summary(self) -> Dict[str, Any]:
+        """Get summary of token usage by model."""
+        summary = {
+            "total_tokens": 0,
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "by_model": {}
+        }
+        
+        for usage in self.token_usage:
+            summary["total_tokens"] += usage.total_tokens
+            summary["prompt_tokens"] += usage.prompt_tokens
+            summary["completion_tokens"] += usage.completion_tokens
+            
+            if usage.model not in summary["by_model"]:
+                summary["by_model"][usage.model] = {
+                    "prompt": 0,
+                    "completion": 0,
+                    "total": 0,
+                    "calls": 0
+                }
+            
+            model_stats = summary["by_model"][usage.model]
+            model_stats["prompt"] += usage.prompt_tokens
+            model_stats["completion"] += usage.completion_tokens
+            model_stats["total"] += usage.total_tokens
+            model_stats["calls"] += 1
+            
+        return summary
     
     def generate_sync(
         self,

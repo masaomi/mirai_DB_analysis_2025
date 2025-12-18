@@ -325,7 +325,7 @@ class MinorityDetector:
             llm_client: LLM client for relevance checking
             
         Returns:
-            List of relevant minority opinions
+            List of relevant minority opinions (limited to minority_top_n)
         """
         if not minorities:
             return []
@@ -338,21 +338,21 @@ class MinorityDetector:
             )
             
             try:
-                response = await llm_client.acomplete(prompt)
+                response = await llm_client.generate(prompt)
                 
                 # Parse JSON response
                 json_start = response.find('{')
                 json_end = response.rfind('}') + 1
                 if json_start >= 0 and json_end > json_start:
                     data = json.loads(response[json_start:json_end])
-                    is_relevant = data.get("relevant", True)
+                    is_relevant = data.get("relevant", False)  # Default to False for stricter filtering
                     return (opinion, is_relevant)
                 else:
-                    # If parsing fails, include by default
-                    return (opinion, True)
-            except Exception:
-                # On error, include by default
-                return (opinion, True)
+                    # If parsing fails, exclude by default
+                    return (opinion, False)
+            except Exception as e:
+                # On error, exclude by default for stricter filtering
+                return (opinion, False)
         
         # Check all opinions in parallel
         tasks = [check_relevance(m) for m in minorities]
@@ -361,7 +361,8 @@ class MinorityDetector:
         # Filter to keep only relevant opinions
         relevant = [opinion for opinion, is_relevant in results if is_relevant]
         
-        return relevant
+        # Apply top_n limit after relevance filtering
+        return relevant[:self.settings.minority_top_n]
     
     def filter_by_relevance_sync(
         self,

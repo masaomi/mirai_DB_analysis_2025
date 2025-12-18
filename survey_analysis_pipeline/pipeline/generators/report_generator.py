@@ -23,15 +23,14 @@ REPORT_TEMPLATE = """# {{ survey_title }} - 分析レポート
 
 ## 📑 目次
 
-- [エグゼクティブサマリー](#executive-summary)
+{% if multi_llm_consensus %}- [Multi-LLM 統合分析結果](#multi-llm-analysis){% else %}- [エグゼクティブサマリー](#executive-summary){% endif %}
 - [量的解釈の制約](#quantitative-bias)
 {% if filter_stats %}- [フィルタリング統計](#filter-stats){% endif %}
 - [回答者の立場分布](#stance-distribution)
 - [主要な発見事項](#key-findings)
-{% if multi_llm_consensus %}- [Multi-LLM 分析結果](#multi-llm-analysis){% endif %}
 {% if ronten_summaries %}- [論点別分析](#ronten-analysis){% endif %}
 {% if novel_insights %}- [論点にない新しい視点](#novel-insights){% endif %}
-- [質的スコア凡例](#quality-legend)
+{% if show_quality_scores %}- [質的スコア凡例](#quality-legend){% endif %}
 - [意見クラスタ別分析](#cluster-analysis)
 - [合意点と対立点](#consensus-disagreement)
 - [マイノリティ意見](#minority-opinions)
@@ -41,6 +40,62 @@ REPORT_TEMPLATE = """# {{ survey_title }} - 分析レポート
 
 ---
 
+{% if multi_llm_consensus %}
+<a id="multi-llm-analysis"></a>
+
+## 🤖 Multi-LLM 統合分析結果
+
+複数のLLMモデル（Claude, GPT-4, Gemini等）による分析結果を統合しました。
+
+### スコア詳細
+
+| 指標 | 値 | 説明 |
+|------|-----|------|
+| **合意スコア** | {{ "%.1f"|format(multi_llm_consensus.agreement_score * 100) }}% | `合意点数 / (合意点数 + 対立点数)` |
+{% if multi_llm_consensus.discussion_rounds %}
+| **相互評価平均スコア** | {{ "%.1f"|format(multi_llm_consensus.discussion_rounds[-1].consensus_score * 100) }}% | 各LLMが他のLLM回答を評価した平均（0-10点を正規化） |
+{% endif %}
+| **議論ラウンド数** | {{ multi_llm_consensus.discussion_rounds | length }} | 合意形成までの反復回数 |
+
+### 統合された知見（エグゼクティブサマリー）
+
+{{ multi_llm_consensus.consensus_content }}
+
+{% if multi_llm_consensus.disagreements %}
+### ⚠️ モデル間で意見が分かれた点
+
+{% for disagreement in multi_llm_consensus.disagreements -%}
+- {{ disagreement }}
+{% endfor %}
+{% endif %}
+
+{% if multi_llm_consensus.referenced_sessions or multi_llm_consensus.referenced_clusters %}
+### 参照情報
+
+{% if multi_llm_consensus.referenced_sessions %}
+**参照セッション**:
+{% for session in multi_llm_consensus.referenced_sessions -%}
+- [セッション {{ session[:8] }}...](https://depth-interview-ai.vercel.app/report/{{ session }})
+{% endfor %}
+{% endif %}
+
+{% if multi_llm_consensus.referenced_clusters %}
+**参照クラスタ**:
+{% for cluster_id in multi_llm_consensus.referenced_clusters -%}
+- クラスタ {{ cluster_id }}
+{% endfor %}
+{% endif %}
+
+{% endif %}
+
+### 詳細レポート
+
+- [議論ログ (discussion_log.md)](multi_llm/discussion_log.md)
+- [評価マトリクス (evaluation_matrix.json)](multi_llm/evaluation_matrix.json)
+- [合意レポート (consensus_report.md)](multi_llm/consensus_report.md)
+
+---
+{% else %}
 <a id="executive-summary"></a>
 
 ## エグゼクティブサマリー
@@ -48,6 +103,7 @@ REPORT_TEMPLATE = """# {{ survey_title }} - 分析レポート
 {{ executive_summary }}
 
 ---
+{% endif %}
 
 <a id="quantitative-bias"></a>
 
@@ -89,6 +145,25 @@ REPORT_TEMPLATE = """# {{ survey_title }} - 分析レポート
 
 - **LLMコール数**: {{ filter_stats.llm_calls_made }}回
 - **節約したLLMコール**: {{ filter_stats.llm_calls_saved }}回（全件チェック比）
+{% if token_usage and token_usage.total_tokens > 0 %}
+- **総トークン数**: 約{{ "{:,}".format(token_usage.total_tokens) }}トークン
+  - 送信: {{ "{:,}".format(token_usage.prompt_tokens) }}
+  - 受信: {{ "{:,}".format(token_usage.completion_tokens) }}
+
+{% if token_usage.by_model %}
+
+### モデル別使用量
+
+| モデル | 送信 | 受信 | 合計 | コール数 |
+|--------|------|------|------|----------|
+{%- for model, usage in token_usage.by_model.items() %}
+| {{ model }} | {{ "{:,}".format(usage.prompt) if usage.prompt else "-" }} | {{ "{:,}".format(usage.completion) if usage.completion else "-" }} | {{ "{:,}".format(usage.total) }} | {{ usage.calls }} |
+{%- endfor %}
+
+{% endif %}
+{% else %}
+> ℹ️ トークン使用量: キャッシュされた応答を使用（新規APIコールなし）
+{% endif %}
 
 ---
 {% endif %}
@@ -170,63 +245,6 @@ REPORT_TEMPLATE = """# {{ survey_title }} - 分析レポート
 {% endfor %}
 
 ---
-
-{% if multi_llm_consensus %}
-<a id="multi-llm-analysis"></a>
-
-## 🤖 Multi-LLM 分析結果
-
-複数のLLMモデルによる分析結果を統合しました。
-
-### スコア詳細
-
-| 指標 | 値 | 説明 |
-|------|-----|------|
-| **合意スコア** | {{ "%.1f"|format(multi_llm_consensus.agreement_score * 100) }}% | `合意点数 / (合意点数 + 対立点数)` |
-{% if multi_llm_consensus.discussion_rounds %}
-| **相互評価平均スコア** | {{ "%.1f"|format(multi_llm_consensus.discussion_rounds[-1].consensus_score * 100) }}% | 各LLMが他のLLM回答を評価した平均（0-10点を正規化） |
-{% endif %}
-| **議論ラウンド数** | {{ multi_llm_consensus.discussion_rounds | length }} | 合意形成までの反復回数 |
-
-### 統合された知見
-
-{{ multi_llm_consensus.consensus_content }}
-
-{% if multi_llm_consensus.disagreements %}
-### ⚠️ モデル間で意見が分かれた点
-
-{% for disagreement in multi_llm_consensus.disagreements -%}
-- {{ disagreement }}
-{% endfor %}
-{% endif %}
-
-{% if multi_llm_consensus.referenced_sessions or multi_llm_consensus.referenced_clusters %}
-### 参照情報
-
-{% if multi_llm_consensus.referenced_sessions %}
-**参照セッション**:
-{% for session in multi_llm_consensus.referenced_sessions -%}
-- [セッション {{ session[:8] }}...](https://depth-interview-ai.vercel.app/report/{{ session }})
-{% endfor %}
-{% endif %}
-
-{% if multi_llm_consensus.referenced_clusters %}
-**参照クラスタ**:
-{% for cluster_id in multi_llm_consensus.referenced_clusters -%}
-- クラスタ {{ cluster_id }}
-{% endfor %}
-{% endif %}
-
-{% endif %}
-
-### 詳細レポート
-
-- [議論ログ (discussion_log.md)](multi_llm/discussion_log.md)
-- [評価マトリクス (evaluation_matrix.json)](multi_llm/evaluation_matrix.json)
-- [合意レポート (consensus_report.md)](multi_llm/consensus_report.md)
-
----
-{% endif %}
 
 {% if ronten_summaries %}
 <a id="ronten-analysis"></a>
@@ -471,7 +489,8 @@ class ReportData:
     overall_summary: OverallSummary
     persona_analysis: Optional[Dict[str, Any]] = None
     multi_llm_consensus: Optional[Dict[str, Any]] = None
-    filter_stats: Optional[Dict[str, Any]] = None  # Added filter stats
+    filter_stats: Optional[Dict[str, Any]] = None
+    token_usage: Optional[Dict[str, Any]] = None
 
 
 class ReportGenerator:
@@ -553,8 +572,11 @@ class ReportGenerator:
             "multi_llm_consensus": data.multi_llm_consensus,
             "persona_analysis": data.persona_analysis,
             "filter_stats": data.filter_stats,
+            # Token usage and display settings
+            "token_usage": data.token_usage,
+            "show_quality_scores": self.settings.report_show_quality_scores,
         }
-        
+
         return self.template.render(**context)
     
     def generate_html(

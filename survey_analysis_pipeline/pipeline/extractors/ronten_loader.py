@@ -93,25 +93,56 @@ class RontenLoader:
     def load_ronten_content(self, survey_slug: str) -> str:
         """Load ronten content for a specific survey slug.
         
+        Searches for ronten files matching the pattern:
+        - {survey_slug}_ronten.txt
+        - {survey_slug}_*_ronten.txt
+        
+        Only loads files that start with the survey slug to avoid loading
+        unrelated ronten files.
+        
         Args:
             survey_slug: The slug of the survey (e.g. 'bill-of-lading')
             
         Returns:
-            Content of the ronten file or empty string if not found
+            Combined content of all matching ronten files or empty string if not found
         """
-        filename = self.settings.ronten_file_mapping.get(survey_slug)
-        if not filename:
-            return ""
-            
-        file_path = self.settings.data_dir / filename
+        from pathlib import Path
+        data_dir = Path(self.settings.data_dir)
         
-        try:
-            if file_path.exists():
-                return file_path.read_text(encoding='utf-8')
+        if not data_dir.exists():
             return ""
-        except Exception as e:
-            print(f"Error loading ronten file {file_path}: {e}")
+        
+        # Find all ronten files matching the survey slug pattern
+        # Pattern: {survey_slug}_*_ronten.txt or {survey_slug}_ronten.txt
+        matching_files = []
+        for file_path in data_dir.glob(f"{survey_slug}*_ronten.txt"):
+            # Ensure the file starts with the exact survey slug
+            filename = file_path.name
+            if filename.startswith(f"{survey_slug}_"):
+                matching_files.append(file_path)
+        
+        if not matching_files:
+            # Fallback to explicit mapping for backward compatibility
+            filename = self.settings.ronten_file_mapping.get(survey_slug)
+            if filename:
+                file_path = data_dir / filename
+                if file_path.exists():
+                    matching_files = [file_path]
+        
+        if not matching_files:
             return ""
+        
+        # Load and combine all matching files
+        contents = []
+        for file_path in sorted(matching_files):
+            try:
+                content = file_path.read_text(encoding='utf-8')
+                if content.strip():
+                    contents.append(f"# Source: {file_path.name}\n\n{content}")
+            except Exception as e:
+                print(f"Error loading ronten file {file_path}: {e}")
+        
+        return "\n\n---\n\n".join(contents)
     
     def get_ronten_items(self, survey_slug: str) -> List[RontenItem]:
         """Get structured ronten items for a survey slug.

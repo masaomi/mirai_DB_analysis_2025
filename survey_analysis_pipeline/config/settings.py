@@ -101,12 +101,12 @@ class Settings(BaseSettings):
         description="Top percentage for minority detection"
     )
     minority_top_n: int = Field(
-        default=10,
+        default=3,  # Changed from 10 to 3
         description="Number of minority opinions to extract"
     )
     minority_min_score: float = Field(
-        default=0.5,
-        description="Minimum outlier score for minority opinions (0-1, equivalent to 5/10)"
+        default=0.7,  # Changed from 0.5 to 0.7
+        description="Minimum outlier score for minority opinions (0-1)"
     )
     minority_relevance_check: bool = Field(
         default=True,
@@ -193,6 +193,16 @@ class Settings(BaseSettings):
         description="Sort clusters by quality score in report"
     )
     
+    # Report Settings
+    report_max_clusters: int = Field(
+        default=3,
+        description="Maximum number of clusters to show in standard report"
+    )
+    report_show_quality_scores: bool = Field(
+        default=False,
+        description="Show detailed quality scores in standard report"
+    )
+
     # Cache Settings
     cache_enabled: bool = Field(
         default=True,
