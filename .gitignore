@@ -17,6 +17,7 @@ survey_analysis_pipeline/.cache/
 survey_analysis_pipeline/**/__pycache__/
 survey_analysis_pipeline/**/*.pyc
 survey_analysis_pipeline/outputs/
+survey_analysis_pipeline/outputs_bak/
 
 # Survey Analysis
 survey_analysis/.env
@@ -32,3 +33,4 @@ survey_report_viewer/.env
 survey_report_viewer/.env.*
 survey_report_viewer/node_modules/
 survey_report_viewer/.next/
+
