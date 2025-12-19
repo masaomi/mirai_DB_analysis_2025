@@ -213,7 +213,7 @@ class Settings(BaseSettings):
         description="Enable compact report generation (10-15 pages)"
     )
     compact_max_clusters: int = Field(
-        default=5,
+        default=3,
         description="Maximum number of top clusters to show in compact report"
     )
     compact_max_minorities: int = Field(
