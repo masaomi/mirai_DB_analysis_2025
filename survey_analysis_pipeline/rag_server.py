@@ -710,6 +710,17 @@ def create_app() -> FastAPI:
         await session.interrupt_queue.put(request.content)
         return {"status": "interrupted"}
 
+    @api.post("/persona/stop")
+    async def stop_session(session_id: str):
+        """Stop a discussion session."""
+        session = session_manager.get_session(session_id)
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found")
+        
+        session.is_active = False
+        await session.add_event("end", {"reason": "user_stopped"})
+        return {"status": "stopped"}
+
     @api.post("/persona/save")
     async def save_session_log(session_id: str = ""): # TODO: Implement saving logic
         # Implementation for saving logs

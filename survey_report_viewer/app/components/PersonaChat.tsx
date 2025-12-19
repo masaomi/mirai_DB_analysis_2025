@@ -170,6 +170,7 @@ export default function PersonaChat({ sessionId, initialPersonas, onEnd }: Props
           "max_rounds_reached": "最大ラウンド数に到達",
           "time_limit_reached": "時間制限に到達",
           "token_limit_reached": "トークン上限に到達",
+          "user_stopped": "ユーザーによる中止",
         };
         const reasonText = endReasons[event.data.reason] || event.data.reason;
         setMessages(prev => [...prev, {
@@ -313,6 +314,24 @@ export default function PersonaChat({ sessionId, initialPersonas, onEnd }: Props
     alert("レポートをクリップボードにコピーしました");
   };
 
+  const handleStopDiscussion = async () => {
+    if (status !== "active") return;
+    
+    if (!confirm("ディスカッションを中止しますか？")) return;
+    
+    try {
+      await fetch("/api/persona/stop", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: sessionId }),
+      });
+      // The end event will be received via SSE
+    } catch (e) {
+      console.error("Failed to stop discussion", e);
+      alert("中止に失敗しました");
+    }
+  };
+
   return (
     <div className="flex h-[calc(100vh-100px)] gap-6">
       {/* Main Chat Area */}
@@ -335,6 +354,16 @@ export default function PersonaChat({ sessionId, initialPersonas, onEnd }: Props
                 )}
             </div>
             <div className="flex gap-2">
+                {status === "active" && (
+                    <button 
+                        onClick={handleStopDiscussion}
+                        className="flex items-center gap-1 px-3 py-1.5 text-sm bg-red-100 text-red-700 hover:bg-red-200 rounded-lg transition-colors"
+                        title="ディスカッションを中止"
+                    >
+                        <StopCircle className="w-4 h-4" />
+                        <span className="hidden sm:inline">中止</span>
+                    </button>
+                )}
                 <button 
                     onClick={handleSaveLog}
                     className="flex items-center gap-1 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-200 rounded-lg transition-colors"
