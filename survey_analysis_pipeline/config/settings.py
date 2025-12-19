@@ -225,6 +225,20 @@ class Settings(BaseSettings):
         description="Move detailed scores to appendix in compact report"
     )
     
+    # LLM Request Settings
+    llm_timeout: int = Field(
+        default=300,
+        description="Timeout in seconds for LLM API calls"
+    )
+    llm_retries: int = Field(
+        default=3,
+        description="Number of retries for failed LLM calls"
+    )
+    llm_retry_delay: float = Field(
+        default=5.0,
+        description="Delay in seconds between retries"
+    )
+    
     # Cache Settings
     cache_enabled: bool = Field(
         default=True,

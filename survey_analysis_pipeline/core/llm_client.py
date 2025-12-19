@@ -157,28 +157,44 @@ class LLMClient:
         if self.settings.llm_provider == LLMProvider.BEDROCK:
             kwargs["aws_region_name"] = self.settings.aws_region
         
-        # Call LLM
-        try:
-            response = await litellm.acompletion(**kwargs)
-            result = response.choices[0].message.content
-            
-            # Track token usage
-            if hasattr(response, 'usage') and response.usage:
-                self.token_usage.append(TokenUsage(
-                    model=kwargs["model"],
-                    prompt_tokens=response.usage.prompt_tokens,
-                    completion_tokens=response.usage.completion_tokens,
-                    total_tokens=response.usage.total_tokens,
-                ))
-            
-            # Cache result
-            if use_cache and self._cache is not None:
-                self._cache.set(cache_key, result, expire=86400)  # 24 hour cache
-            
-            return result
-            
-        except Exception as e:
-            raise RuntimeError(f"LLM call failed: {e}") from e
+        # Call LLM with retry logic
+        last_error = None
+        for attempt in range(self.settings.llm_retries):
+            try:
+                response = await litellm.acompletion(
+                    **kwargs,
+                    timeout=self.settings.llm_timeout,
+                    num_retries=0,  # We handle retries ourselves
+                )
+                result = response.choices[0].message.content
+                
+                # Track token usage
+                if hasattr(response, 'usage') and response.usage:
+                    self.token_usage.append(TokenUsage(
+                        model=kwargs["model"],
+                        prompt_tokens=response.usage.prompt_tokens,
+                        completion_tokens=response.usage.completion_tokens,
+                        total_tokens=response.usage.total_tokens,
+                    ))
+                
+                # Cache result
+                if use_cache and self._cache is not None:
+                    self._cache.set(cache_key, result, expire=86400)  # 24 hour cache
+                
+                return result
+                
+            except (litellm.Timeout, litellm.APIConnectionError) as e:
+                last_error = e
+                if attempt < self.settings.llm_retries - 1:
+                    wait_time = self.settings.llm_retry_delay * (attempt + 1)
+                    print(f"LLM call timed out (attempt {attempt + 1}/{self.settings.llm_retries}), "
+                          f"retrying in {wait_time}s...")
+                    await asyncio.sleep(wait_time)
+                continue
+            except Exception as e:
+                raise RuntimeError(f"LLM call failed: {e}") from e
+        
+        raise RuntimeError(f"LLM call failed after {self.settings.llm_retries} attempts: {last_error}") from last_error
     
     def get_usage_summary(self) -> Dict[str, Any]:
         """Get summary of token usage by model."""
