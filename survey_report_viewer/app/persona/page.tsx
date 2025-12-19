@@ -103,6 +103,7 @@ function PersonaPageContent() {
           isLoading={isLoading}
           initialTopic={reportContext?.topic}
           initialContext={reportContext?.summary}
+          initialSlug={reportContext?.slug}
         />
       </div>
     </main>
@@ -120,4 +121,5 @@ export default function PersonaPage() {
     </Suspense>
   );
 }
+
 

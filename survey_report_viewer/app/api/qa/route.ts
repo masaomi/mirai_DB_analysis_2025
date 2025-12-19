@@ -139,6 +139,7 @@ async function searchRAG(slug: string, query: string, topK: number = 8): Promise
       },
       body: JSON.stringify({
         query: query,
+        slug: slug, // Pass slug to backend
         n_results: topK,
       }),
     });

@@ -48,6 +48,7 @@ app_cli = typer.Typer()
 
 class QueryRequest(BaseModel):
     query: str
+    slug: Optional[str] = None # Optional for backward compatibility or default
     n_results: int = 10
 
 class QueryResult(BaseModel):
@@ -76,6 +77,7 @@ class DiscussionSettings(BaseModel):
     facilitator_id: str
     topic: str
     context: str = ""  # Report content or summary
+    slug: Optional[str] = None # For RAG context
     max_rounds: int = 10
     max_time_minutes: int = 30
     max_tokens: int = 50000
@@ -90,9 +92,61 @@ class SessionResponse(BaseModel):
     status: str
 
 # --- Global State ---
-_chroma_client: Optional[chromadb.PersistentClient] = None
-_collection: Optional[chromadb.Collection] = None
-_metadata: Optional[Dict[str, Any]] = None
+# Cache for loaded collections: {slug: Collection}
+_collections_cache: Dict[str, chromadb.Collection] = {}
+# Default collection (if loaded via CLI arg)
+_default_slug: Optional[str] = None
+
+# --- Helper Functions ---
+
+def get_outputs_dir() -> Path:
+    """Get the outputs directory path."""
+    # Assuming this script is in survey_analysis_pipeline/
+    # and outputs are in survey_analysis_pipeline/outputs/
+    return Path(__file__).parent / "outputs"
+
+def get_collection(slug: Optional[str]) -> Optional[chromadb.Collection]:
+    """Get ChromaDB collection for a specific survey slug."""
+    global _collections_cache, _default_slug
+    
+    target_slug = slug or _default_slug
+    
+    if not target_slug:
+        return None
+        
+    # Check cache first
+    if target_slug in _collections_cache:
+        return _collections_cache[target_slug]
+    
+    # Load from disk
+    outputs_dir = get_outputs_dir()
+    index_dir = outputs_dir / target_slug / "vector_index"
+    metadata_path = index_dir / "metadata.json"
+    
+    if not index_dir.exists():
+        print(f"Index not found for slug: {target_slug} at {index_dir}")
+        return None
+        
+    try:
+        # Load metadata to get collection name
+        collection_name = "survey_data" # Default
+        if metadata_path.exists():
+            with open(metadata_path, 'r', encoding='utf-8') as f:
+                metadata = json.load(f)
+                collection_name = metadata.get("collection_name", "survey_data")
+        
+        # Initialize client and get collection
+        client = chromadb.PersistentClient(path=str(index_dir))
+        collection = client.get_collection(name=collection_name)
+        
+        # Cache it
+        _collections_cache[target_slug] = collection
+        print(f"Loaded collection for {target_slug}")
+        return collection
+        
+    except Exception as e:
+        print(f"Error loading collection for {target_slug}: {e}")
+        return None
 
 # --- Persona Session Logic ---
 
@@ -323,10 +377,14 @@ async def run_discussion(session_id: str):
         
         # RAG Search for Context
         rag_context = ""
-        if _collection:
+        
+        # Get appropriate collection for this session
+        collection = get_collection(session.settings.slug)
+        
+        if collection:
             try:
                 # Query using the topic
-                results = _collection.query(
+                results = collection.query(
                     query_texts=[session.settings.topic],
                     n_results=10,
                     include=["documents", "metadatas"]
@@ -548,19 +606,8 @@ async def generate_persona_response(session: PersonaSession, persona_id: str, is
 
 # --- FastAPI App ---
 
-def create_app(index_dir: Path) -> FastAPI:
-    """Create FastAPI app with ChromaDB initialized."""
-    global _chroma_client, _collection, _metadata
-    
-    # Load metadata if exists (RAG mode)
-    metadata_path = index_dir / "metadata.json"
-    if metadata_path.exists():
-        with open(metadata_path, 'r', encoding='utf-8') as f:
-            _metadata = json.load(f)
-        collection_name = _metadata.get("collection_name", "survey_data")
-        _chroma_client = chromadb.PersistentClient(path=str(index_dir))
-        _collection = _chroma_client.get_collection(name=collection_name)
-    
+def create_app() -> FastAPI:
+    """Create FastAPI app."""
     # Create FastAPI app
     api = FastAPI(
         title="RAG Search & Persona API",
@@ -579,21 +626,30 @@ def create_app(index_dir: Path) -> FastAPI:
     
     @api.get("/health")
     async def health():
+        global _default_slug, _collections_cache
         return {
             "status": "ok",
-            "documents": _collection.count() if _collection else 0,
-            "active_sessions": len(session_manager.sessions)
+            "active_sessions": len(session_manager.sessions),
+            "loaded_collections": list(_collections_cache.keys()),
+            "default_collection": _default_slug
         }
     
     # --- RAG Endpoints ---
     
     @api.post("/query", response_model=QueryResponse)
     async def query(request: QueryRequest):
-        if not _collection:
-            raise HTTPException(status_code=500, detail="Collection not initialized")
+        collection = get_collection(request.slug)
+        
+        if not collection:
+            # Try default if slug is None
+            if not request.slug and _default_slug:
+                 collection = get_collection(_default_slug)
+            
+            if not collection:
+                raise HTTPException(status_code=404, detail=f"Collection not found for slug: {request.slug or _default_slug or 'None'}")
         
         try:
-            results = _collection.query(
+            results = collection.query(
                 query_texts=[request.query],
                 n_results=request.n_results,
                 include=["documents", "metadatas", "distances"],
@@ -615,8 +671,8 @@ def create_app(index_dir: Path) -> FastAPI:
             
             return QueryResponse(
                 results=formatted_results,
-                collection_name=_metadata.get("collection_name", "") if _metadata else "",
-                total_documents=_collection.count(),
+                collection_name=collection.name,
+                total_documents=collection.count(),
             )
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
@@ -664,10 +720,9 @@ def create_app(index_dir: Path) -> FastAPI:
 
 @app_cli.command()
 def serve(
-    slug: str = typer.Argument(..., help="Survey slug"),
+    slug: Optional[str] = typer.Option(None, "--slug", "-s", help="Default survey slug to load"),
     port: int = typer.Option(8001, "--port", "-p", help="Port to serve on"),
     host: str = typer.Option("localhost", "--host", "-h", help="Host to bind to"),
-    output_dir: Optional[Path] = typer.Option(None, "--output", "-o", help="Output directory"),
 ):
     """Start RAG search API server."""
     from rich.console import Console
@@ -675,28 +730,28 @@ def serve(
     
     console = Console()
     
-    if output_dir is None:
-        # Default path relative to this script or current dir
-        output_dir = Path("outputs") / slug
-    
-    index_dir = output_dir / "vector_index"
-    
-    # Warn but don't fail if index doesn't exist (allow Persona-only mode)
-    if not index_dir.exists():
-        console.print(f"[yellow]Index not found at: {index_dir}[/yellow]")
-        console.print("[yellow]RAG features will be disabled. Persona Assembly still available.[/yellow]")
+    # Set default slug if provided
+    if slug:
+        global _default_slug
+        _default_slug = slug
+        
+        # Try to preload
+        if get_collection(slug):
+            console.print(f"[green]Successfully preloaded collection for {slug}[/green]")
+        else:
+            console.print(f"[yellow]Warning: Could not preload collection for {slug}[/yellow]")
     
     # Create app
-    api = create_app(index_dir)
+    api = create_app()
     
     console.print(Panel(
         f"[bold blue]RAG & Persona API Server[/bold blue]\n"
-        f"Survey: {slug}\n"
+        f"Default Slug: {slug or 'None'}\n"
         f"URL: http://{host}:{port}\n"
         f"\n"
         f"[dim]Endpoints:[/dim]\n"
         f"  GET  /health          - Check status\n"
-        f"  POST /query           - RAG Search\n"
+        f"  POST /query           - RAG Search (slug supported)\n"
         f"  POST /persona/start   - Start Discussion\n"
         f"  GET  /persona/stream  - SSE Stream\n",
         title="Server Running",
@@ -708,4 +763,5 @@ def serve(
 
 if __name__ == "__main__":
     app_cli()
+
 

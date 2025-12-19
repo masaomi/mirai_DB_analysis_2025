@@ -19,6 +19,7 @@ export interface DiscussionSettings {
   facilitator_id: string;
   topic: string;
   context: string;
+  slug?: string;
   max_rounds: number;
   max_time_minutes: number;
   max_tokens: number;
@@ -82,9 +83,10 @@ interface Props {
   isLoading: boolean;
   initialTopic?: string;
   initialContext?: string;
+  initialSlug?: string;
 }
 
-export default function PersonaSettings({ onStart, isLoading, initialTopic, initialContext }: Props) {
+export default function PersonaSettings({ onStart, isLoading, initialTopic, initialContext, initialSlug }: Props) {
   // Model list from API
   const [availableModels, setAvailableModels] = useState<ModelInfo[]>([]);
   const [modelsLoading, setModelsLoading] = useState(true);
@@ -238,6 +240,7 @@ export default function PersonaSettings({ onStart, isLoading, initialTopic, init
       facilitator_id: facilitatorId,
       topic,
       context,
+      slug: initialSlug,
       max_rounds: maxRounds,
       max_time_minutes: maxTimeMinutes,
       max_tokens: maxTokens,
@@ -549,4 +552,5 @@ export default function PersonaSettings({ onStart, isLoading, initialTopic, init
     </div>
   );
 }
+
 
