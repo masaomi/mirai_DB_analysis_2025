@@ -4,7 +4,7 @@ import { useChat } from "ai/react";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
 import { useState, useRef, useEffect, Suspense } from "react";
 import Link from "next/link";
-import { Send, ArrowLeft, Bot, User, Info, Database, FileText, ExternalLink, HelpCircle } from "lucide-react";
+import { Send, ArrowLeft, Bot, User, Info, Database, FileText, ExternalLink, HelpCircle, Users } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -182,6 +182,14 @@ function QAContent() {
           >
             <Database size={14} />
             RAG
+          </Link>
+          <div className="w-px h-6 bg-gray-300 mx-1" />
+          <Link
+            href={`/persona?slug=${slug}`}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:from-purple-600 hover:to-pink-600 transition-colors font-medium"
+          >
+            <Users size={14} />
+            Persona
           </Link>
         </div>
       </header>

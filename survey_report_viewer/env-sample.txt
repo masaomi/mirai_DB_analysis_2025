@@ -1,0 +1,27 @@
+# Survey Report Viewer - Environment Variables Sample
+# Copy this file to .env.local and fill in your values
+# cp env-sample.txt .env.local
+
+# LLM Provider for Q&A
+# Options: ollama, bedrock, openrouter
+LLM_PROVIDER=openrouter
+
+# --- Ollama Settings (if LLM_PROVIDER=ollama) ---
+OLLAMA_BASE_URL=http://localhost:11434/v1
+OLLAMA_MODEL=llama3.2
+
+# --- OpenRouter Settings (if LLM_PROVIDER=openrouter) ---
+OPENROUTER_API_KEY=your_openrouter_api_key_here
+OPENROUTER_MODEL=anthropic/claude-3.5-sonnet
+OPENROUTER_SITE_URL=http://localhost:3000
+OPENROUTER_SITE_NAME=Survey Report Viewer
+
+# --- AWS Bedrock Settings (if LLM_PROVIDER=bedrock) ---
+# AWS_REGION=us-east-1
+# AWS_ACCESS_KEY_ID=your_access_key
+# AWS_SECRET_ACCESS_KEY=your_secret_key
+# BEDROCK_MODEL_ID=anthropic.claude-3-5-sonnet-20241022-v2:0
+
+# --- RAG Server (Python Backend) ---
+RAG_SERVER_URL=http://localhost:8001
+

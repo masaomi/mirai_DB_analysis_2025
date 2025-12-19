@@ -7,6 +7,9 @@ const OUTPUTS_DIR = path.join(process.cwd(), "..", "survey_analysis_pipeline", "
 export async function GET() {
   try {
     // Check if outputs directory exists
+    console.log("OUTPUTS_DIR:", OUTPUTS_DIR);
+    console.log("exists:", fs.existsSync(OUTPUTS_DIR));
+    
     if (!fs.existsSync(OUTPUTS_DIR)) {
       return NextResponse.json({ reports: [] });
     }
@@ -14,6 +17,8 @@ export async function GET() {
     const dirs = fs.readdirSync(OUTPUTS_DIR, { withFileTypes: true })
       .filter(dirent => dirent.isDirectory())
       .map(dirent => dirent.name);
+
+    console.log("Found directories:", dirs);
 
     const reports = [];
 
@@ -31,12 +36,24 @@ export async function GET() {
               : "Unknown",
             response_count: data.response_count || 0,
           });
-        } catch {
-          // Skip invalid files
+          console.log("Added report:", dir);
+        } catch (e) {
+          console.error("Error parsing", dir, e);
         }
       }
     }
 
+    // Sort by generated_at (newest first) and prioritize non-backup
+    reports.sort((a, b) => {
+      // Prioritize non-backup reports
+      const aIsBackup = a.slug.includes("backup");
+      const bIsBackup = b.slug.includes("backup");
+      if (!aIsBackup && bIsBackup) return -1;
+      if (aIsBackup && !bIsBackup) return 1;
+      return 0;
+    });
+
+    console.log("Total reports:", reports.length);
     return NextResponse.json({ reports });
   } catch (error) {
     console.error("Error reading reports:", error);

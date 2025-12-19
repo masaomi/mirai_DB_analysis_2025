@@ -5,7 +5,8 @@ import { useState, useEffect, use } from "react";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { ArrowLeft, MessageSquare, Download, Share2, ArrowRight } from "lucide-react";
+import rehypeRaw from "rehype-raw";
+import { ArrowLeft, MessageSquare, Download, Share2, ArrowRight, Users } from "lucide-react";
 
 interface ReportData {
   slug: string;
@@ -113,6 +114,13 @@ export default function ReportPage({
             </div>
             <div className="flex items-center gap-2">
               <Link
+                href={`/persona?slug=${slug}&title=${encodeURIComponent(report.analysisData.survey_title || slug)}`}
+                className="flex items-center gap-2 px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors"
+              >
+                <Users className="w-4 h-4" />
+                Persona
+              </Link>
+              <Link
                 href={`/qa/${slug}`}
                 className="flex items-center gap-2 px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors"
               >
@@ -124,34 +132,29 @@ export default function ReportPage({
         </div>
       </header>
 
-      {/* Charts */}
-      {report.charts.length > 0 && (
-        <div className="bg-white border-b border-slate-200">
-          <div className="max-w-4xl mx-auto px-6 py-8">
-            <h2 className="text-lg font-semibold text-slate-700 mb-4">📊 チャート</h2>
-            <div className="grid gap-6 md:grid-cols-2">
-              {report.charts.map((chart, i) => (
-                <div
-                  key={i}
-                  className="bg-slate-50 rounded-xl shadow-sm p-4 border border-slate-200"
-                >
-                  <img
-                    src={chart}
-                    alt={`Chart ${i + 1}`}
-                    className="w-full h-auto rounded-lg"
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Report Content */}
       <div className="max-w-4xl mx-auto px-6 py-8">
         <article className="bg-white rounded-xl shadow-sm border border-slate-200 p-8 mb-8">
-          <div className="prose max-w-none prose-headings:text-slate-800 prose-p:text-slate-600 prose-li:text-slate-600">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+          <div className="prose max-w-none prose-headings:text-slate-800 prose-p:text-slate-600 prose-li:text-slate-600 prose-a:text-primary-600 prose-a:no-underline hover:prose-a:underline prose-table:text-sm">
+            <ReactMarkdown 
+              remarkPlugins={[remarkGfm]}
+              rehypePlugins={[rehypeRaw]}
+              components={{
+                // Handle internal anchor links
+                a: ({ node, href, children, ...props }) => {
+                  // External links open in new tab
+                  if (href?.startsWith("http")) {
+                    return (
+                      <a href={href} target="_blank" rel="noopener noreferrer" {...props}>
+                        {children}
+                      </a>
+                    );
+                  }
+                  // Internal anchor links
+                  return <a href={href} {...props}>{children}</a>;
+                },
+              }}
+            >
               {report.markdown}
             </ReactMarkdown>
           </div>

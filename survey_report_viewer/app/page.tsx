@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { FileText, MessageSquare, BarChart3 } from "lucide-react";
+import { FileText, MessageSquare, BarChart3, Users } from "lucide-react";
 
 interface SurveyReport {
   slug: string;
@@ -98,7 +98,7 @@ export default function Home() {
         )}
 
         {/* Quick Links */}
-        <div className="mt-12 grid gap-4 md:grid-cols-3">
+        <div className="mt-12 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
             <BarChart3 className="w-8 h-8 text-primary-500 mb-3" />
             <h3 className="font-semibold text-slate-800 mb-2">分析機能</h3>
@@ -120,6 +120,16 @@ export default function Home() {
               RAGベースのチャットでレポートについて質問
             </p>
           </div>
+          <Link href="/persona" className="bg-white p-6 rounded-xl shadow-sm border border-primary-200 ring-1 ring-primary-100 hover:shadow-md transition-all group cursor-pointer block">
+            <Users className="w-8 h-8 text-primary-600 mb-3 group-hover:scale-110 transition-transform" />
+            <h3 className="font-semibold text-primary-900 mb-2 flex items-center gap-2">
+              Persona Assembly
+              <span className="text-[10px] bg-primary-100 text-primary-700 px-2 py-0.5 rounded-full">NEW</span>
+            </h3>
+            <p className="text-sm text-slate-600">
+              複数のAIペルソナによる合意形成ディスカッション
+            </p>
+          </Link>
         </div>
       </div>
     </main>
