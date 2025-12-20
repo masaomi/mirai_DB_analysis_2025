@@ -445,9 +445,20 @@ class MultiLLMOrchestrator:
                 prev_round = discussion_rounds[-1]
                 improved_tasks = []
                 
+                # #region agent log
+                import json as _json; open('/Users/masa/forback/github/mirai_DB_backup/.cursor/debug.log', 'a').write(_json.dumps({"location":"multi_llm.py:448","message":"Processing responses for improvement","data":{"round_num":round_num,"num_responses":len(current_responses),"error_responses":[r.model for r in current_responses if r.content.startswith("Error:")]},"timestamp":__import__('time').time()*1000,"sessionId":"debug-session","hypothesisId":"A"})+'\n')
+                # #endregion
+                
+                async def _return_existing_response(r):
+                    """Helper to return existing response as a coroutine for asyncio.gather compatibility."""
+                    return r
+                
                 for resp in current_responses:
                     if resp.content.startswith("Error:"):
-                        improved_tasks.append(asyncio.coroutine(lambda r=resp: r)())
+                        # #region agent log
+                        import json as _json; open('/Users/masa/forback/github/mirai_DB_backup/.cursor/debug.log', 'a').write(_json.dumps({"location":"multi_llm.py:450","message":"Skipping error response","data":{"model":resp.model,"error_prefix":resp.content[:100]},"timestamp":__import__('time').time()*1000,"sessionId":"debug-session","hypothesisId":"A"})+'\n')
+                        # #endregion
+                        improved_tasks.append(_return_existing_response(resp))
                         continue
                     
                     feedback = self._get_feedback_for_model(resp.model, prev_round.evaluations)
