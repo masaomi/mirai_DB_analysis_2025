@@ -7,6 +7,7 @@ import Link from "next/link";
 import { Send, ArrowLeft, Bot, User, Info, Database, FileText, ExternalLink, HelpCircle, Users } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import OpenRouterCredits from "../../components/OpenRouterCredits";
 
 interface MessageMetadata {
   sources?: Array<{ id: string; title: string }>;
@@ -161,6 +162,7 @@ function QAContent() {
         
         {/* Mode Toggle */}
         <div className="flex items-center gap-2">
+          <OpenRouterCredits mode="compact" className="hidden sm:flex" />
           <Link
             href={`/qa/${slug}?mode=simple`}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-colors ${

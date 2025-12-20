@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { Send, User, Bot, StopCircle, Download, FileText, AlertCircle, ClipboardCopy, FileDown } from "lucide-react";
 import { PersonaConfig } from "./PersonaSettings";
 import TokenUsageDisplay from "./TokenUsageDisplay";
+import OpenRouterCredits from "./OpenRouterCredits";
 
 interface ChatMessage {
   id: string;
@@ -528,6 +529,7 @@ export default function PersonaChat({ sessionId, initialPersonas, onEnd }: Props
 
       {/* Right Sidebar: Stats */}
       <div className="w-80 flex flex-col gap-6">
+        <OpenRouterCredits mode="full" />
         <TokenUsageDisplay stats={tokenStats} personas={initialPersonas} />
         
         {/* Session Info */}
@@ -558,4 +560,5 @@ export default function PersonaChat({ sessionId, initialPersonas, onEnd }: Props
     </div>
   );
 }
+
 
