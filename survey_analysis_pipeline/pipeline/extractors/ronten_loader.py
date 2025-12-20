@@ -1,5 +1,6 @@
 """Loader for ronten (issue points) files with structured parsing."""
 
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional, List, Dict, Any
@@ -144,8 +145,81 @@ class RontenLoader:
         
         return "\n\n---\n\n".join(contents)
     
+    def _parse_ronten_from_content(self, content: str) -> List[RontenItem]:
+        """Parse ronten items from markdown-formatted content.
+        
+        Expects format like:
+        ### 1. タイトル
+        内容...
+        
+        ### 2. タイトル
+        内容...
+        
+        Args:
+            content: Markdown-formatted ronten content
+            
+        Returns:
+            List of RontenItem objects parsed from content
+        """
+        items = []
+        
+        # Pattern to match numbered sections: ### 1. Title or ### 1. Title (with optional number formats)
+        # Also handles formats like "### 1. Title" or "### 1. タイトル"
+        section_pattern = r'###\s*(\d+)\.\s*(.+?)(?=\n)'
+        
+        # Find all section headers
+        matches = list(re.finditer(section_pattern, content))
+        
+        for i, match in enumerate(matches):
+            section_num = match.group(1)
+            title = match.group(2).strip()
+            
+            # Extract content between this header and the next (or end of content)
+            start_pos = match.end()
+            if i + 1 < len(matches):
+                end_pos = matches[i + 1].start()
+            else:
+                end_pos = len(content)
+            
+            description = content[start_pos:end_pos].strip()
+            
+            # Clean up the description - remove sub-headers and excessive whitespace
+            # but keep the main content
+            description_lines = []
+            for line in description.split('\n'):
+                line = line.strip()
+                if line and not line.startswith('###'):
+                    description_lines.append(line)
+            
+            description = ' '.join(description_lines)
+            
+            # Truncate very long descriptions
+            if len(description) > 500:
+                description = description[:500] + "..."
+            
+            # Generate a simple ID from the section number and title
+            item_id = f"ronten_{section_num}_{re.sub(r'[^a-zA-Z0-9]', '_', title[:20])}"
+            
+            # Extract potential keywords from the title and first part of description
+            keywords = []
+            # Add words from title
+            title_words = re.findall(r'[\u4e00-\u9fff\u3040-\u309f\u30a0-\u30ffA-Za-z]+', title)
+            keywords.extend([w for w in title_words if len(w) >= 2])
+            
+            items.append(RontenItem(
+                id=item_id,
+                title=title,
+                description=description,
+                keywords=keywords[:10],  # Limit keywords
+            ))
+        
+        return items
+    
     def get_ronten_items(self, survey_slug: str) -> List[RontenItem]:
         """Get structured ronten items for a survey slug.
+        
+        First checks for pre-defined items, then falls back to parsing
+        from ronten text files if available.
         
         Args:
             survey_slug: The slug of the survey
@@ -156,11 +230,18 @@ class RontenLoader:
         if survey_slug in self._ronten_items_cache:
             return self._ronten_items_cache[survey_slug]
         
-        # Currently only bill-of-lading has predefined ronten items
+        # Check for pre-defined ronten items first
         if survey_slug == "bill-of-lading":
             items = BILL_OF_LADING_RONTEN
         else:
-            items = []
+            # Try to parse from ronten content file
+            content = self.load_ronten_content(survey_slug)
+            if content:
+                items = self._parse_ronten_from_content(content)
+                if items:
+                    print(f"  ✓ Parsed {len(items)} ronten items from file for {survey_slug}")
+            else:
+                items = []
         
         self._ronten_items_cache[survey_slug] = items
         return items
