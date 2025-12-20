@@ -97,6 +97,14 @@
             text-align: left;
         }
         .reveal .improvement-box strong { color: #166534; }
+        .reveal .controversy-box {
+            background: #fef2f2;
+            border-left: 4px solid #ef4444;
+            padding: 0.8em;
+            margin: 0.5em 0;
+            text-align: left;
+            font-size: 0.85em;
+        }
     </style>
 </head>
 <body>
@@ -107,7 +115,8 @@
             <section>
                 <h1>Survey Analysis Pipeline<br>&amp; Report Viewer</h1>
                 <h3 style="color: #64748b;">AI駆動のアンケート分析・可視化システム</h3>
-                <p class="small" style="margin-top: 2em; color: #94a3b8;">2025-12-20</p>
+                <p style="margin-top: 2em; font-size: 1.1em; color: #1e40af;"><strong>Masa@Swiss</strong></p>
+                <p class="small" style="color: #94a3b8;">2025-12-20</p>
             </section>
 
             <!-- Slide 2: System Overview -->
@@ -149,7 +158,8 @@
                 <ol style="font-size: 0.85em;">
                     <li><strong>Multi-LLM Orchestration</strong>: 複数LLMでの合意形成<br>
                         <span class="small" style="color: #d97706;">→ これが<strong>エグゼクティブサマリー</strong>となる</span></li>
-                    <li><strong>論点ベース分析</strong>: 法制審議会の論点に沿った意見集約</li>
+                    <li><strong>論点ベース分析</strong>: 法制審議会の論点に沿った意見集約<br>
+                        <span class="small" style="color: #d97706;">→ 今回youkitiさんの資料をもとにronten.txtを作成</span></li>
                     <li><strong>クラスタリング</strong>: HDBSCAN + Embedding で類似意見をグループ化</li>
                     <li><strong>立場検出</strong>: 賛成/反対/中立を自動判定</li>
                     <li><strong>マイノリティ検出</strong>: 少数派だが重要な意見を抽出</li>
@@ -277,89 +287,83 @@
             <!-- Slide 9: Teisuu Report -->
             <section>
                 <h2>8. レポート: 国会議員定数削減法案</h2>
+                <p class="small" style="color: #64748b;">総回答数: 11,359件 | 相互評価: 88.5%</p>
                 <div class="insight-box">
                     <h4>🎯 インサイトの質</h4>
                     <ul class="small">
-                        <li><strong>制度への深い理解</strong>: 「ゾンビ議員」（比例復活当選）制度への不満が賛否を超えて共有</li>
-                        <li><strong>政治的影響の分析</strong>: 比例削減による新興政党・少数政党の国政参入困難化への懸念</li>
+                        <li><strong>制度への深い理解</strong>: 「ゾンビ議員」（比例復活当選）への不満が賛否を超えて広く共有</li>
+                        <li><strong>多様性への懸念</strong>: 比例削減による少数政党・新興政党の国政参入困難化</li>
                         <li><strong>実務的視点</strong>: 削減目的・根拠が不明確、コスト削減効果も限定的という指摘</li>
                     </ul>
                 </div>
+                <div class="controversy-box">
+                    <strong>⚠️ モデル間で意見が分かれた点:</strong> 比例vs小選挙区どちらを削減すべきか / 中選挙区制への回帰か維持か
+                </div>
                 <div class="summary-text">
-                    <strong>エグゼクティブサマリー:</strong> 単純な定数削減ではなく選挙制度全体の見直しとセットで議論すべき。制度の詳細理解が不十分な回答者が多く、丁寧な説明と国民への周知が必要。
+                    <strong>エグゼクティブサマリー:</strong> 賛成23%、反対12%、中立60%と意見が分散。単純な定数削減ではなく選挙制度全体の見直しとセットで議論すべき。
                 </div>
             </section>
 
             <!-- Slide 10: AI Plan Report -->
             <section>
                 <h2>9. レポート: 人工知能基本計画法案</h2>
+                <p class="small" style="color: #64748b;">総回答数: 11,566件 | 相互評価: 90.0%</p>
                 <div class="insight-box">
                     <h4>🎯 インサイトの質</h4>
                     <ul class="small">
-                        <li><strong>専門的論点</strong>: AIの透明性・説明可能性、国産LLM開発による「AI主権」確保</li>
-                        <li><strong>当事者視点</strong>: クリエイターの著作権保護、雇用への影響とセーフティネット</li>
-                        <li><strong>制度設計への提言</strong>: ソフトロー中心への懸念、第三者機関による独立監査体制の必要性</li>
+                        <li><strong>認知度の課題</strong>: 回答者の過半数が計画内容を「知らない」状態</li>
+                        <li><strong>専門的論点</strong>: 透明性・説明可能性、国産LLM開発による「AI主権」確保</li>
+                        <li><strong>当事者視点</strong>: クリエイターの著作権保護、雇用影響とセーフティネット（ベーシックインカム等）</li>
                     </ul>
                 </div>
+                <div class="controversy-box">
+                    <strong>⚠️ モデル間で意見が分かれた点:</strong> ハードロー規制の必要性 / 著作権と学習データの扱い / 国産LLM開発の方向性
+                </div>
                 <div class="summary-text">
-                    <strong>エグゼクティブサマリー:</strong> 回答者の過半数が計画を「知らない」状態で認知度が低い。最終判断は人間が行うべき点、医療・防災・行政分野でのAI活用優先、AIリテラシー教育の必要性で広く合意形成。
+                    <strong>エグゼクティブサマリー:</strong> 医療・防災・行政サービスがAI導入の最優先分野として支持。第三者機関による監査・評価体制の構築が必要。
                 </div>
             </section>
 
             <!-- Slide 11: Evaluation Criteria -->
             <section>
                 <h2>10. 審査基準への対応</h2>
-                <div class="criteria-box">
-                    <strong>📊 インサイトの質</strong>: 専門知識・実務経験・当事者経験に基づく意見を<br>
-                    クラスタリング + マイノリティ検出 + 論点マッチングで抽出
+                <div class="insight-box" style="margin-bottom: 1em;">
+                    <h4>🚀 レポート生成システムの特徴</h4>
+                    <ul class="small" style="margin: 0.3em 0;">
+                        <li><strong>AIと機械的手法の合成</strong>による（ほぼ）全自動生成</li>
+                        <li><strong>インタラクティブ</strong>による深掘りQ&A</li>
+                        <li><strong>専門家AI</strong>とのディスカッション（ペルソナアセンブリ）</li>
+                    </ul>
                 </div>
-                <div class="criteria-box">
-                    <strong>📖 読みやすさ・伝わりやすさ</strong>: Multi-LLM合意形成による<br>
-                    エグゼクティブサマリー、クラスタ別の構造化された分析
-                </div>
-                <div class="criteria-box">
-                    <strong>✅ 正確性</strong>: 複数LLMの相互評価・クロスチェック、<br>
-                    元データへのリンク（セッションID参照）
-                </div>
-                <div class="criteria-box">
-                    <strong>💰 生成コスト</strong>: クラスタ単位でのLLM呼び出し最適化、<br>
-                    トークン使用量のトラッキング・レポート出力
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5em;">
+                    <div class="criteria-box">
+                        <strong>📊 インサイトの質</strong><br>
+                        <span class="small">クラスタリング + マイノリティ検出 + 論点マッチング</span>
+                    </div>
+                    <div class="criteria-box">
+                        <strong>📖 読みやすさ</strong><br>
+                        <span class="small">Multi-LLM合意形成によるエグゼクティブサマリー</span>
+                    </div>
+                    <div class="criteria-box">
+                        <strong>✅ 正確性</strong><br>
+                        <span class="small">複数LLMの相互評価、元データへのリンク</span>
+                    </div>
+                    <div class="criteria-box">
+                        <strong>💰 生成コスト</strong><br>
+                        <span class="small">クラスタ単位でのLLM呼び出し最適化</span>
+                    </div>
                 </div>
             </section>
 
-            <!-- Slide 12: Persona Report (Placeholder) -->
+            <!-- Slide 12: Thank you -->
             <section>
-                <h2>11. ペルソナアセンブリ レポート</h2>
-                <div class="placeholder-box">
-                    <p style="font-size: 1.2em;">📝 別途提供されるレポート内容を表示</p>
-                    <p class="small">(このスライドにペルソナアセンブリの詳細レポートを挿入予定)</p>
-                </div>
-            </section>
-
-            <!-- Slide 13: Tech Stack (Bonus) -->
-            <section>
-                <h2>技術スタック</h2>
-                <div style="display: flex; gap: 2em; justify-content: center;">
-                    <div class="architecture-box">
-                        <h4>🐍 Backend (Python)</h4>
-                        <ul class="small">
-                            <li>pixi (パッケージ管理)</li>
-                            <li>litellm (LLM統合)</li>
-                            <li>sentence-transformers</li>
-                            <li>hdbscan (クラスタリング)</li>
-                            <li>chromadb (Vector DB)</li>
-                            <li>FastAPI (RAG Server)</li>
-                        </ul>
-                    </div>
-                    <div class="architecture-box">
-                        <h4>⚛️ Frontend (Next.js 15)</h4>
-                        <ul class="small">
-                            <li>Vercel AI SDK</li>
-                            <li>Tailwind CSS</li>
-                            <li>SSE Streaming</li>
-                            <li>react-markdown</li>
-                        </ul>
-                    </div>
+                <h1 style="margin-top: 1em;">Thank you for your attention</h1>
+                <p style="margin-top: 1.5em; font-size: 1.2em; color: #1e40af;"><strong>Masa@Swiss</strong></p>
+                <div style="margin-top: 2em; padding: 1em; background: #eff6ff; border-radius: 12px; display: inline-block;">
+                    <p style="margin: 0; font-size: 0.9em; color: #64748b;">Survey Report Viewer</p>
+                    <a href="http://ec2-3-124-187-24.eu-central-1.compute.amazonaws.com:3000" target="_blank" style="font-size: 0.8em; color: #2563eb;">
+                        http://ec2-3-124-187-24.eu-central-1.compute.amazonaws.com:3000
+                    </a>
                 </div>
             </section>
 
