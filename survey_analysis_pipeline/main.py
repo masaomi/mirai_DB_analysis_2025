@@ -304,7 +304,17 @@ async def _run_pipeline(
                 
                 task = progress.add_task("[cyan]Summarizing clusters...", total=None)
                 cluster_summarizer = ClusterSummarizer(settings, llm_client)
-                cluster_summaries = await cluster_summarizer.summarize_all_clusters(clusters)
+                
+                # Sort clusters by size (descending) and limit to summarize_max_clusters
+                clusters.sort(key=lambda x: x.size, reverse=True)
+                
+                # Keep noise cluster if it exists in the list (though usually filtered out)
+                # and top N clusters
+                clusters_to_summarize = clusters[:settings.summarize_max_clusters]
+                
+                console.print(f"  ✓ Summarizing top {len(clusters_to_summarize)} clusters (out of {len(clusters)})")
+                
+                cluster_summaries = await cluster_summarizer.summarize_all_clusters(clusters_to_summarize)
                 progress.update(task, completed=True)
                 
                 # Quality Scoring

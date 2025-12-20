@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Survey Analysis Pipeline & Report Viewer</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@4.6.1/dist/reset.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@4.6.1/dist/reveal.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@4.6.1/dist/theme/white.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github.min.css">
+    <style>
+        .reveal h1, .reveal h2, .reveal h3 { color: #1e40af; }
+        .reveal .highlight { color: #d97706; font-weight: bold; }
+        .reveal section { font-size: 0.9em; }
+        .reveal table { font-size: 0.8em; margin: 0 auto; }
+        .reveal th { background: #3b82f6; color: white; }
+        .reveal td, .reveal th { padding: 0.4em 0.8em; border: 1px solid #ddd; }
+        .reveal pre { font-size: 0.7em; }
+        .reveal ul { text-align: left; }
+        .reveal .small { font-size: 0.7em; }
+        .reveal .architecture-box {
+            background: #f1f5f9;
+            border-radius: 12px;
+            padding: 1em;
+            margin: 0.5em;
+            display: inline-block;
+            vertical-align: top;
+        }
+        .reveal .architecture-box h4 { margin: 0 0 0.5em 0; color: #1e40af; }
+        .reveal .arrow { font-size: 2em; color: #3b82f6; margin: 0 0.3em; }
+        .reveal .persona-card {
+            background: #fef3c7;
+            border-left: 4px solid #f59e0b;
+            padding: 0.8em;
+            margin: 0.5em 0;
+            text-align: left;
+            border-radius: 0 8px 8px 0;
+        }
+        .reveal .persona-card strong { color: #b45309; }
+        .reveal .insight-box {
+            background: #eff6ff;
+            border: 2px solid #3b82f6;
+            border-radius: 12px;
+            padding: 1em;
+            margin: 0.5em 0;
+            text-align: left;
+        }
+        .reveal .insight-box h4 { color: #1d4ed8; margin: 0 0 0.5em 0; }
+        .reveal .criteria-box {
+            background: #f0fdf4;
+            border: 2px solid #22c55e;
+            border-radius: 12px;
+            padding: 0.8em;
+            margin: 0.3em 0;
+            text-align: left;
+        }
+        .reveal .criteria-box strong { color: #166534; }
+        .reveal .summary-text {
+            background: #fefce8;
+            border-left: 4px solid #eab308;
+            padding: 1em;
+            font-size: 0.85em;
+            text-align: left;
+            line-height: 1.6;
+        }
+        .reveal .placeholder-box {
+            background: #f3e8ff;
+            border: 3px dashed #a855f7;
+            border-radius: 12px;
+            padding: 2em;
+            color: #7c3aed;
+        }
+        .reveal .ronten-box {
+            background: #fef3c7;
+            border: 2px solid #f59e0b;
+            border-radius: 12px;
+            padding: 1em;
+            margin: 0.5em 0;
+            text-align: left;
+        }
+        .reveal .ronten-box h4 { color: #b45309; margin: 0 0 0.5em 0; }
+        .reveal .feedback-box {
+            background: #fef2f2;
+            border: 2px solid #ef4444;
+            border-radius: 12px;
+            padding: 0.8em;
+            margin: 0.3em 0;
+            text-align: left;
+        }
+        .reveal .feedback-box strong { color: #dc2626; }
+        .reveal .improvement-box {
+            background: #f0fdf4;
+            border: 2px solid #22c55e;
+            border-radius: 12px;
+            padding: 0.8em;
+            margin: 0.3em 0;
+            text-align: left;
+        }
+        .reveal .improvement-box strong { color: #166534; }
+    </style>
+</head>
+<body>
+    <div class="reveal">
+        <div class="slides">
+
+            <!-- Slide 1: Title -->
+            <section>
+                <h1>Survey Analysis Pipeline<br>&amp; Report Viewer</h1>
+                <h3 style="color: #64748b;">AI駆動のアンケート分析・可視化システム</h3>
+                <p class="small" style="margin-top: 2em; color: #94a3b8;">2025-12-20</p>
+            </section>
+
+            <!-- Slide 2: System Overview -->
+            <section>
+                <h2>1. システム全体像</h2>
+                <div style="display: flex; justify-content: center; align-items: center; flex-wrap: wrap;">
+                    <div class="architecture-box">
+                        <h4>📊 Pipeline (Python)</h4>
+                        <ul class="small">
+                            <li>論点ファイル読込</li>
+                            <li>クラスタリング</li>
+                            <li>立場検出</li>
+                            <li>Multi-LLM 合意形成</li>
+                        </ul>
+                        <p class="small" style="margin-top: 0.5em; color: #64748b;">
+                            <strong>出力:</strong> レポート (MD/HTML), RAG Index
+                        </p>
+                    </div>
+                    <span class="arrow">→</span>
+                    <div class="architecture-box">
+                        <h4>🖥️ Viewer (Next.js)</h4>
+                        <ul class="small">
+                            <li>レポート表示</li>
+                            <li>Q&amp;A Chat (RAG)</li>
+                            <li>ペルソナ Assembly</li>
+                        </ul>
+                    </div>
+                </div>
+                <p class="small" style="margin-top: 1em;">
+                    <span class="highlight">Python CLI</span> でデータ分析・レポート生成 → 
+                    <span class="highlight">Next.js</span> でWeb UI・インタラクティブ機能
+                </p>
+            </section>
+
+            <!-- Slide 3: Analysis Pipeline with Ronten -->
+            <section>
+                <h2>2. 分析パイプラインの特徴</h2>
+                <p><code>survey_analysis_pipeline/main.py</code> がエントリーポイント</p>
+                <ol style="font-size: 0.85em;">
+                    <li><strong>Multi-LLM Orchestration</strong>: 複数LLMでの合意形成<br>
+                        <span class="small" style="color: #d97706;">→ これが<strong>エグゼクティブサマリー</strong>となる</span></li>
+                    <li><strong>論点ベース分析</strong>: 法制審議会の論点に沿った意見集約</li>
+                    <li><strong>クラスタリング</strong>: HDBSCAN + Embedding で類似意見をグループ化</li>
+                    <li><strong>立場検出</strong>: 賛成/反対/中立を自動判定</li>
+                    <li><strong>マイノリティ検出</strong>: 少数派だが重要な意見を抽出</li>
+                </ol>
+            </section>
+
+            <!-- Slide 4: Ronten Feature -->
+            <section>
+                <h2>3. 論点ベース分析 (Ronten)</h2>
+                <div class="ronten-box">
+                    <h4>📋 *_ronten.txt による論点定義</h4>
+                    <ul class="small">
+                        <li>法制審議会の論点をあらかじめ <code>{survey_slug}_ronten.txt</code> として定義</li>
+                        <li><code>ronten_loader.py</code>: 論点ファイルを読み込み</li>
+                        <li><code>ronten_matcher.py</code>: 意見を各論点にマッチング</li>
+                    </ul>
+                </div>
+                <div class="insight-box" style="font-size: 0.85em;">
+                    <h4>船荷証券の論点例</h4>
+                    <ul class="small">
+                        <li>機能的同等性（MLETR準拠）</li>
+                        <li>「支配」概念の具体化</li>
+                        <li>情報システム提供者の法的地位</li>
+                        <li>強制執行の実効性確保</li>
+                        <li>紙と電子の相互転換</li>
+                    </ul>
+                </div>
+                <p class="small" style="margin-top: 0.5em;">
+                    → <strong>審議会で議論された論点</strong>と<strong>市民の意見</strong>を対応付けて分析
+                </p>
+            </section>
+
+            <!-- Slide 5: Multi-LLM -->
+            <section>
+                <h2>4. Multi-LLM 合意形成</h2>
+                <p><code>orchestration/multi_llm.py</code></p>
+                <ul>
+                    <li><span class="highlight">複数LLM並列分析</span>: Claude Opus, Sonnet, GPT, Gemini など</li>
+                    <li><span class="highlight">相互評価</span>: 0-10点で品質スコアリング</li>
+                    <li><span class="highlight">反復ディスカッション</span>: 合意閾値(80%)に達するまで議論</li>
+                    <li><span class="highlight">差異の明確化</span>: 合意点・対立点を抽出</li>
+                </ul>
+                <p style="margin-top: 1em;"><strong>出力成果物:</strong></p>
+                <ul class="small">
+                    <li><code>consensus_report.md</code> - 統合レポート</li>
+                    <li><code>discussion_log.md</code> - 議論ログ</li>
+                    <li><code>evaluation_matrix.json</code> - 評価マトリクス</li>
+                </ul>
+            </section>
+
+            <!-- Slide 6: Persona Assembly -->
+            <section>
+                <h2>5. ペルソナアセンブリ</h2>
+                <p>多視点分析のためのAIペルソナ定義</p>
+                <div class="persona-card">
+                    <strong>👔 政策立案者</strong>: 実装可能性、予算、ロードマップ
+                </div>
+                <div class="persona-card">
+                    <strong>👥 一般市民</strong>: 生活への影響、公平性、わかりやすさ
+                </div>
+                <div class="persona-card">
+                    <strong>🔬 批判的研究者</strong>: リスク、見落とし、長期影響
+                </div>
+                <div class="persona-card">
+                    <strong>🗣️ 少数派代弁者</strong>: 多様性、包摂性、特定グループへの影響
+                </div>
+                <p class="small" style="margin-top: 0.5em;">
+                    <span class="highlight">Viewer機能</span>: SSEリアルタイム配信 / ユーザーが議論に割り込み可能
+                </p>
+            </section>
+
+            <!-- Slide 7: Mid-term Feedback Response -->
+            <section>
+                <h2>6. 中間報告へのフィードバック対応</h2>
+                <div style="display: flex; gap: 1em;">
+                    <div style="flex: 1;">
+                        <div class="feedback-box">
+                            <strong>📌 指摘事項</strong>
+                            <ul class="small" style="margin: 0.3em 0;">
+                                <li>レポート量が多すぎる (75ページ)</li>
+                                <li>ノイズ・雑談が混入</li>
+                                <li>細かいスコアが読みにくい</li>
+                                <li>政策的価値での絞り込み不足</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div style="flex: 1;">
+                        <div class="improvement-box">
+                            <strong>✅ 対応策</strong>
+                            <ul class="small" style="margin: 0.3em 0;">
+                                <li>クラスタ単位でのフィルタリング強化</li>
+                                <li>関連性フィルター導入</li>
+                                <li>エグゼクティブサマリー先頭配置</li>
+                                <li>詳細スコアは付録へ移動</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div class="insight-box" style="margin-top: 0.5em;">
+                    <h4>🎯 高評価ポイントの維持</h4>
+                    <ul class="small">
+                        <li><strong>Multi-LLM合意形成</strong>: 独自性・技術的アプローチとして高評価</li>
+                        <li><strong>制約条件の明示</strong>: レポート冒頭の前提条件記載は良い</li>
+                        <li><strong>Web UI統合</strong>: インタラクティブな分析システムへの興味</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- Slide 8: Bill of Lading Report -->
+            <section>
+                <h2>7. レポート: 船荷証券電子化法案</h2>
+                <div class="insight-box">
+                    <h4>🎯 インサイトの質</h4>
+                    <ul class="small">
+                        <li><strong>実務経験者の指摘</strong>: B/L単体ではなく関連書類（原産地証明書等）の一括電子化の必要性</li>
+                        <li><strong>当事者視点</strong>: 中小企業の導入コスト負担、セキュリティ・システム障害への懸念</li>
+                        <li><strong>専門知識</strong>: 電子記録における「支配」概念・権利移転時点の法的明確化の課題</li>
+                    </ul>
+                </div>
+                <div class="summary-text">
+                    <strong>エグゼクティブサマリー:</strong> 成功要因として①セキュリティ対策の徹底、②国際標準（UNCITRAL MLETR）への適合、③中小企業への導入支援、④段階的移行期間の設定が抽出された。
+                </div>
+            </section>
+
+            <!-- Slide 9: Teisuu Report -->
+            <section>
+                <h2>8. レポート: 国会議員定数削減法案</h2>
+                <div class="insight-box">
+                    <h4>🎯 インサイトの質</h4>
+                    <ul class="small">
+                        <li><strong>制度への深い理解</strong>: 「ゾンビ議員」（比例復活当選）制度への不満が賛否を超えて共有</li>
+                        <li><strong>政治的影響の分析</strong>: 比例削減による新興政党・少数政党の国政参入困難化への懸念</li>
+                        <li><strong>実務的視点</strong>: 削減目的・根拠が不明確、コスト削減効果も限定的という指摘</li>
+                    </ul>
+                </div>
+                <div class="summary-text">
+                    <strong>エグゼクティブサマリー:</strong> 単純な定数削減ではなく選挙制度全体の見直しとセットで議論すべき。制度の詳細理解が不十分な回答者が多く、丁寧な説明と国民への周知が必要。
+                </div>
+            </section>
+
+            <!-- Slide 10: AI Plan Report -->
+            <section>
+                <h2>9. レポート: 人工知能基本計画法案</h2>
+                <div class="insight-box">
+                    <h4>🎯 インサイトの質</h4>
+                    <ul class="small">
+                        <li><strong>専門的論点</strong>: AIの透明性・説明可能性、国産LLM開発による「AI主権」確保</li>
+                        <li><strong>当事者視点</strong>: クリエイターの著作権保護、雇用への影響とセーフティネット</li>
+                        <li><strong>制度設計への提言</strong>: ソフトロー中心への懸念、第三者機関による独立監査体制の必要性</li>
+                    </ul>
+                </div>
+                <div class="summary-text">
+                    <strong>エグゼクティブサマリー:</strong> 回答者の過半数が計画を「知らない」状態で認知度が低い。最終判断は人間が行うべき点、医療・防災・行政分野でのAI活用優先、AIリテラシー教育の必要性で広く合意形成。
+                </div>
+            </section>
+
+            <!-- Slide 11: Evaluation Criteria -->
+            <section>
+                <h2>10. 審査基準への対応</h2>
+                <div class="criteria-box">
+                    <strong>📊 インサイトの質</strong>: 専門知識・実務経験・当事者経験に基づく意見を<br>
+                    クラスタリング + マイノリティ検出 + 論点マッチングで抽出
+                </div>
+                <div class="criteria-box">
+                    <strong>📖 読みやすさ・伝わりやすさ</strong>: Multi-LLM合意形成による<br>
+                    エグゼクティブサマリー、クラスタ別の構造化された分析
+                </div>
+                <div class="criteria-box">
+                    <strong>✅ 正確性</strong>: 複数LLMの相互評価・クロスチェック、<br>
+                    元データへのリンク（セッションID参照）
+                </div>
+                <div class="criteria-box">
+                    <strong>💰 生成コスト</strong>: クラスタ単位でのLLM呼び出し最適化、<br>
+                    トークン使用量のトラッキング・レポート出力
+                </div>
+            </section>
+
+            <!-- Slide 12: Persona Report (Placeholder) -->
+            <section>
+                <h2>11. ペルソナアセンブリ レポート</h2>
+                <div class="placeholder-box">
+                    <p style="font-size: 1.2em;">📝 別途提供されるレポート内容を表示</p>
+                    <p class="small">(このスライドにペルソナアセンブリの詳細レポートを挿入予定)</p>
+                </div>
+            </section>
+
+            <!-- Slide 13: Tech Stack (Bonus) -->
+            <section>
+                <h2>技術スタック</h2>
+                <div style="display: flex; gap: 2em; justify-content: center;">
+                    <div class="architecture-box">
+                        <h4>🐍 Backend (Python)</h4>
+                        <ul class="small">
+                            <li>pixi (パッケージ管理)</li>
+                            <li>litellm (LLM統合)</li>
+                            <li>sentence-transformers</li>
+                            <li>hdbscan (クラスタリング)</li>
+                            <li>chromadb (Vector DB)</li>
+                            <li>FastAPI (RAG Server)</li>
+                        </ul>
+                    </div>
+                    <div class="architecture-box">
+                        <h4>⚛️ Frontend (Next.js 15)</h4>
+                        <ul class="small">
+                            <li>Vercel AI SDK</li>
+                            <li>Tailwind CSS</li>
+                            <li>SSE Streaming</li>
+                            <li>react-markdown</li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/reveal.js@4.6.1/dist/reveal.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/reveal.js@4.6.1/plugin/highlight/highlight.js"></script>
+    <script>
+        Reveal.initialize({
+            hash: true,
+            slideNumber: true,
+            plugins: [ RevealHighlight ],
+            transition: 'slide',
+            width: 1280,
+            height: 720
+        });
+    </script>
+</body>
+</html>

@@ -96,6 +96,10 @@ class Settings(BaseSettings):
         default=10,
         description="Number of clusters to check in one LLM call"
     )
+    summarize_max_clusters: int = Field(
+        default=30,
+        description="Maximum number of clusters to summarize (sorted by size)"
+    )
     min_cluster_size_for_report: int = Field(
         default=10,
         description="Minimum cluster size to include in report (smaller clusters handled as minority)"
