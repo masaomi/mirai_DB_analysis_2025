@@ -1,6 +1,12 @@
 # Survey Analysis System
 
-自由記述式アンケートデータを自動解析し、レポート生成・Q&A機能を提供する統合システムです。
+AI駆動のアンケート分析システム - 自由記述式アンケートデータを自動解析し、レポート生成・Q&A機能を提供する統合システムです。
+
+## システムの特徴
+
+- **AIと機械的手法の合成**による（ほぼ）全自動レポート生成
+- **インタラクティブ**による深掘りQ&A
+- **専門家AI**とのディスカッション（ペルソナアセンブリ）
 
 ## システム概要
 
@@ -13,13 +19,12 @@
 │  │  survey_analysis_pipeline │      │  survey_report_viewer    │         │
 │  │  (Python CLI)             │      │  (Next.js Web App)       │         │
 │  │                           │      │                          │         │
-│  │  • データ抽出              │      │  • レポート表示           │         │
-│  │  • 立場検出                │      │  • チャート表示           │         │
-│  │  • クラスタリング          │ ───→ │  • Q&A Chat              │         │
-│  │  • LLM要約                │      │  • RAGモード対応          │         │
+│  │  • 論点ファイル読込        │      │  • レポート表示           │         │
+│  │  • クラスタリング          │      │  • Q&A Chat (RAG)        │         │
+│  │  • 立場検出                │ ───→ │  • ペルソナ Assembly      │         │
+│  │  • Multi-LLM 合意形成      │      │                          │         │
 │  │  • レポート生成            │      │                          │         │
 │  │  • RAGインデックス         │      │                          │         │
-│  │  • RAGサーバー             │      │                          │         │
 │  └──────────────────────────┘      └──────────────────────────┘         │
 │           │                                   │                          │
 │           ▼                                   ▼                          │
@@ -27,7 +32,7 @@
 │  │  outputs/{slug}/                                              │       │
 │  │  ├── report.md          # Markdownレポート                    │       │
 │  │  ├── analysis_data.json # 分析データ                          │       │
-│  │  ├── charts/            # チャート画像                        │       │
+│  │  ├── multi_llm/         # Multi-LLM議論ログ                   │       │
 │  │  └── vector_index/      # RAGインデックス                     │       │
 │  └──────────────────────────────────────────────────────────────┘       │
 │                                                                          │
@@ -36,17 +41,46 @@
 
 ## 主要機能
 
+### 分析パイプライン (survey_analysis_pipeline)
+
 | 機能 | 説明 |
 |-----|------|
-| **自動立場検出** | 賛成/反対/中立を自動判定 |
-| **意見クラスタリング** | 類似意見をHDBSCANでグループ化 |
+| **Multi-LLM Orchestration** | 複数LLM（Claude, GPT, Gemini等）による合意形成 → **エグゼクティブサマリー**生成 |
+| **論点ベース分析** | 法制審議会の論点（`*_ronten.txt`）に沿った意見集約 |
+| **意見クラスタリング** | HDBSCAN + Embeddingで類似意見をグループ化 |
+| **立場検出** | 賛成/反対/中立を自動判定 |
 | **マイノリティ検出** | 少数派だが重要な意見を抽出 |
-| **LLM要約** | Map-Reduce方式による階層的要約 |
-| **Multi LLM** | 複数LLMによる合意形成（オプション） |
-| **Persona Assembly** | 多視点分析（オプション） |
-| **チャート生成** | 立場分布、クラスタサイズ、ワードクラウド |
-| **Q&A Chat** | レポートについてLLMに質問 |
-| **RAG検索** | セマンティック検索で関連回答を取得 |
+| **レポート生成** | Markdown/HTML形式のレポート自動生成 |
+
+### Webビューア (survey_report_viewer)
+
+| 機能 | 説明 |
+|-----|------|
+| **レポート表示** | 生成されたレポートをWeb UIで閲覧 |
+| **Q&A Chat** | レポートについてLLMに質問（シンプル/RAGモード） |
+| **ペルソナアセンブリ** | 生成されたレポートの深掘り・検証ツール |
+
+### ペルソナアセンブリ
+
+レポートをもとに見落としがないか、さらに深掘りするためのツールです。
+
+| ペルソナ | 主な観点 |
+|:--------|:--------|
+| **政策立案者** | 実装可能性、予算、ロードマップ |
+| **批判的研究者** | リスク、見落とし、長期影響 |
+| **技術専門家** | 技術的実現性、インフラ、セキュリティ |
+| **経済専門家** | 費用対効果、経済波及効果、持続可能性 |
+
+- リアルタイムSSE配信で議論をストリーミング表示
+- ユーザーが議論に割り込んで質問・指摘が可能
+
+## 分析済みレポート
+
+| 法案 | 回答数 | 主な知見 |
+|-----|-------|---------|
+| **船荷証券電子化法案** | 2,148件 | セキュリティ対策、国際標準適合、中小企業支援が成功要因 |
+| **国会議員定数削減法案** | 11,359件 | 「ゾンビ議員」への不満が広く共有、選挙制度全体の見直しが必要 |
+| **人工知能基本計画法案** | 11,566件 | 認知度の低さが課題、医療・防災・行政がAI導入の最優先分野 |
 
 ## クイックスタート
 
@@ -62,7 +96,7 @@ cp env_example.txt .env
 # Next.js環境
 cd ../survey_report_viewer
 pnpm install
-cp .env.example .env
+cp env-sample.txt .env
 # .envを編集してLLMプロバイダーを設定
 ```
 
@@ -74,8 +108,8 @@ cd survey_analysis_pipeline
 # 利用可能なアンケート一覧
 pixi run python main.py list-surveys
 
-# 分析実行
-pixi run python main.py analyze bill-of-lading
+# 分析実行（Multi-LLM + ペルソナ有効）
+pixi run python main.py analyze bill-of-lading --multi-llm --persona
 ```
 
 ### 3. RAGサーバー起動（Q&A用）
@@ -96,28 +130,48 @@ pnpm build && pnpm start
 
 - **レポート一覧**: http://localhost:3000
 - **レポート詳細**: http://localhost:3000/reports/bill-of-lading
-- **Q&A (シンプル)**: http://localhost:3000/qa/bill-of-lading?mode=simple
 - **Q&A (RAG)**: http://localhost:3000/qa/bill-of-lading?mode=rag
+- **ペルソナ Assembly**: http://localhost:3000/persona?slug=bill-of-lading
 
-## データセット
+## 論点ベース分析 (Ronten)
 
-### データ概要
+法制審議会の論点をあらかじめ `{survey_slug}_ronten.txt` として定義し、意見を論点にマッチングさせます。
 
-| 項目 | 内容 |
-|------|------|
-| バックアップファイル | `backup-2025-11-14T03-19-14.json` / `.sql` |
-| データ種別 | PostgreSQL形式のデータベースバックアップ |
-| セッション数 | 15,341件 |
-| メッセージ数 | 142,237件（ユーザー回答65,318件） |
+```
+survey_analysis_pipeline/
+├── pipeline/extractors/ronten_loader.py   # 論点ファイル読込
+└── pipeline/analyzers/ronten_matcher.py   # 意見を論点にマッチング
+```
 
-### 主要トピック
+### 船荷証券の論点例
+- 機能的同等性（MLETR準拠）
+- 「支配」概念の具体化
+- 情報システム提供者の法的地位
+- 強制執行の実効性確保
+- 紙と電子の相互転換
 
-| トピック | セッション数 |
-|---------|------------|
-| 国会議員定数削減 | 6,604 |
-| 人工知能基本計画 | 4,561 |
-| チームみらい1年プラン | 2,403 |
-| 船荷証券の電子化法案 | 888 |
+## Multi-LLM Orchestration
+
+複数のLLMが並列で分析し、相互評価・合意形成を行います。
+
+```
+orchestration/multi_llm.py
+```
+
+- **複数LLM並列分析**: Claude Opus, Sonnet, GPT, Gemini など
+- **相互評価**: 0-10点で品質スコアリング
+- **反復ディスカッション**: 合意閾値(80%)に達するまで議論
+- **差異の明確化**: 合意点・対立点を抽出
+
+### 出力成果物
+
+```
+outputs/{slug}/multi_llm/
+├── consensus_report.md      # 統合レポート（エグゼクティブサマリー）
+├── discussion_log.md        # 議論ログ
+├── evaluation_matrix.json   # 評価マトリクス
+└── {model}_output.md        # 各モデルの個別出力
+```
 
 ## LLMプロバイダー
 
@@ -152,36 +206,34 @@ OPENROUTER_MODEL=anthropic/claude-3.5-sonnet
 ## ディレクトリ構成
 
 ```
-mirai_DB_backup/
+mirai_DB_analysis_2025/
 ├── survey_analysis_pipeline/   # Python分析パイプライン
 │   ├── main.py                # CLIエントリーポイント
 │   ├── rag_server.py          # RAG検索サーバー
 │   ├── config/                # 設定ファイル
-│   ├── core/                  # コアモジュール
+│   ├── core/                  # コアモジュール (LLMクライアント)
 │   ├── pipeline/              # パイプラインモジュール
-│   ├── orchestration/         # Multi LLM / Persona
+│   │   ├── extractors/       # データ抽出 (ronten_loader含む)
+│   │   ├── analyzers/        # 分析 (ronten_matcher含む)
+│   │   ├── summarizers/      # 要約
+│   │   └── generators/       # 出力生成
+│   ├── orchestration/         # Multi LLM / Persona Assembly
 │   └── outputs/               # 生成されたレポート
 │
 ├── survey_report_viewer/       # Next.js Webビューア
 │   ├── app/                   # App Router
 │   │   ├── api/              # API Routes
 │   │   ├── reports/          # レポートページ
-│   │   └── qa/               # Q&Aページ
+│   │   ├── qa/               # Q&Aページ
+│   │   ├── persona/          # ペルソナAssemblyページ
+│   │   └── components/       # UIコンポーネント
 │   └── package.json
 │
 ├── data/                       # アンケートCSVデータ
-│   ├── bill-of-lading_messages.csv
-│   └── ...
+│   └── *_ronten.txt           # 論点定義ファイル
 │
-├── backup-*.json              # 元データバックアップ
 └── README.md                  # このファイル
 ```
-
-## 詳細ドキュメント
-
-- [survey_analysis_pipeline/README.md](survey_analysis_pipeline/README.md) - Python分析パイプラインの詳細
-- [survey_report_viewer/README.md](survey_report_viewer/README.md) - Next.js Webビューアの詳細
-- [README_old.md](README_old.md) - 旧版の解析ツール（参考用）
 
 ## 技術スタック
 
@@ -205,8 +257,18 @@ mirai_DB_backup/
 | フレームワーク | Next.js 15 (App Router) |
 | スタイリング | Tailwind CSS |
 | LLM統合 | Vercel AI SDK |
+| ストリーミング | SSE (Server-Sent Events) |
 | Markdown | react-markdown, remark-gfm |
+
+## 詳細ドキュメント
+
+- [survey_analysis_pipeline/README.md](survey_analysis_pipeline/README.md) - Python分析パイプラインの詳細
+- [survey_report_viewer/README.md](survey_report_viewer/README.md) - Next.js Webビューアの詳細
 
 ## ライセンス
 
 MIT
+
+## Author
+
+Masa@Swiss

@@ -90,7 +90,7 @@ style: |
 
 ## 5. ペルソナアセンブリ
 
-多視点分析のためのAIペルソナ定義:
+生成されたレポートをもとに深掘りするためのツール:
 
 | ペルソナ | 主な観点 |
 |:--------|:--------|
@@ -192,3 +192,6 @@ style: |
 
 Survey Report Viewer:
 http://ec2-3-124-187-24.eu-central-1.compute.amazonaws.com:3000
+
+GitHub Repository:
+https://github.com/masaomi/mirai_DB_analysis_2025
