@@ -89,8 +89,12 @@ class Settings(BaseSettings):
         description="Minimum characters for valid response"
     )
     clustering_min_samples: int = Field(
-        default=3,
+        default=5,
         description="Minimum samples for HDBSCAN clustering"
+    )
+    cluster_filter_batch_size: int = Field(
+        default=10,
+        description="Number of clusters to check in one LLM call"
     )
     min_cluster_size_for_report: int = Field(
         default=10,

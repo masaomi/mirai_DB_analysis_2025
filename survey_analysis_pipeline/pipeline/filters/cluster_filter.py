@@ -107,6 +107,44 @@ JSON形式で出力してください：
 """
 
 
+BATCH_CLUSTER_RELEVANCE_PROMPT = """以下の複数のクラスタ（回答グループ）が「{survey_title}」に関する法案検討に参考になる知見を含むか、一括で判定してください。
+
+## 法制審議会での主な論点（コンテキスト）
+{ronten_context}
+
+## クラスタ一覧
+{clusters_info}
+
+## 判定基準
+各クラスタについて、以下の基準で判定してください：
+
+### 関連あり（relevant: true）
+- 法案の論点に関係する具体的な意見
+- 実務上の課題・メリット・デメリット
+- 専門知識・当事者経験に基づく懸念や指摘
+
+### 関連なし（relevant: false）- 必ず除外
+以下のカテゴリは法案検討に無関係なので**必ず除外**してください：
+1. **挨拶・謝辞**: 「ありがとう」「お疲れ様」等
+2. **システム・UIへの意見**: 「このアンケートの質問が〜」等
+3. **空虚・無意味な回答**: 「わからない」「特になし」等
+4. **テーマ無関係**: 法案と全く関係ない話題
+5. **政党・選挙への一般的応援**: 法案の内容に触れない単なる応援
+
+JSON形式のリストで出力してください：
+[
+    {{
+        "cluster_id": クラスタID (整数),
+        "relevant": true/false,
+        "score": 0.0〜1.0,
+        "reason": "判定理由（簡潔に）",
+        "related_ronten": "関連する論点（あれば）"
+    }},
+    ...
+]
+"""
+
+
 class ClusterBasedFilter:
     """Filter responses based on cluster characteristics to reduce API calls."""
     
@@ -122,6 +160,7 @@ class ClusterBasedFilter:
         self.auto_include_threshold = self.settings.min_cluster_size_for_report  # 10
         self.medium_cluster_min = 3
         self.samples_to_check = 2  # For medium clusters
+        self.batch_size = self.settings.cluster_filter_batch_size
     
     async def filter_clusters(
         self,
@@ -133,7 +172,7 @@ class ClusterBasedFilter:
         
         Strategy:
         - Large clusters (≥10): Auto-include (clearly on-topic by clustering)
-        - Medium clusters (3-9): LLM check 1-2 representative samples
+        - Medium clusters (3-9): LLM check 1-2 representative samples (Batch processed)
         - Small clusters (<3) and noise (-1): Handled separately as potential minorities
         
         Args:
@@ -157,12 +196,13 @@ class ClusterBasedFilter:
         
         total_responses = sum(c.size for c in clusters)
         
+        # Group clusters by type
+        medium_clusters: List[ClusterResult] = []
+        
         for cluster in clusters:
             # Noise cluster (cluster_id == -1) - handle separately
             if cluster.cluster_id == -1:
                 noise_count = cluster.size
-                # We'll filter noise responses individually for minorities later
-                # For now, mark as excluded from main clusters but track count
                 filter_results.append(ClusterFilterResult(
                     cluster_id=-1,
                     cluster_label="Noise",
@@ -190,21 +230,11 @@ class ClusterBasedFilter:
                     checked_samples=0,
                 ))
                 
-            # Medium clusters: LLM check
+            # Medium clusters: Queue for batch LLM check
             elif cluster.size >= self.medium_cluster_min:
-                llm_checked += 1
-                result = await self._check_cluster_relevance(
-                    cluster, survey_title, ronten_context
-                )
-                llm_calls += 1
-                filter_results.append(result)
-                
-                if result.is_relevant:
-                    included_clusters.append(cluster)
-                else:
-                    excluded += 1
+                medium_clusters.append(cluster)
                     
-            # Small clusters: Exclude from main analysis (may be picked up as minorities)
+            # Small clusters: Exclude
             else:
                 excluded += 1
                 filter_results.append(ClusterFilterResult(
@@ -217,6 +247,48 @@ class ClusterBasedFilter:
                     reason=f"小規模クラスタ（{cluster.size}件 < {self.medium_cluster_min}）は除外（マイノリティ検出で再評価）",
                     checked_samples=0,
                 ))
+        
+        # Process medium clusters in batches
+        if medium_clusters:
+            # Split into batches
+            batches = [
+                medium_clusters[i:i + self.batch_size]
+                for i in range(0, len(medium_clusters), self.batch_size)
+            ]
+            
+            for batch in batches:
+                llm_checked += len(batch)
+                llm_calls += 1
+                
+                batch_results = await self._check_clusters_batch(
+                    batch, survey_title, ronten_context
+                )
+                
+                # Map results back to clusters
+                result_map = {r.cluster_id: r for r in batch_results}
+                
+                for cluster in batch:
+                    # Get result or create fallback
+                    if cluster.cluster_id in result_map:
+                        result = result_map[cluster.cluster_id]
+                    else:
+                        # Fallback if ID not found in LLM response
+                        result = ClusterFilterResult(
+                            cluster_id=cluster.cluster_id,
+                            cluster_label=cluster.label,
+                            cluster_size=cluster.size,
+                            is_relevant=True,  # Default to relevant on error
+                            filter_method="llm_check_missing",
+                            relevance_score=0.5,
+                            reason="バッチ処理で結果が見つかりませんでした（デフォルト採用）",
+                            checked_samples=self.samples_to_check,
+                        )
+                    
+                    filter_results.append(result)
+                    if result.is_relevant:
+                        included_clusters.append(cluster)
+                    else:
+                        excluded += 1
         
         # Calculate stats
         final_responses = sum(c.size for c in included_clusters)
@@ -237,6 +309,101 @@ class ClusterBasedFilter:
         
         return included_clusters, filter_results, stats
     
+    async def _check_clusters_batch(
+        self,
+        clusters: List[ClusterResult],
+        survey_title: str,
+        ronten_context: str,
+    ) -> List[ClusterFilterResult]:
+        """Check relevance of multiple medium-sized clusters in one LLM call."""
+        context_str = ronten_context[:2000] if ronten_context else "（特になし）"
+        
+        # Format clusters info
+        clusters_info_parts = []
+        for c in clusters:
+            samples = c.responses[:self.samples_to_check]
+            sample_text = " / ".join(
+                f"sample: {r.content[:100]}..." 
+                for r in samples
+            )
+            keywords = ", ".join(c.keywords[:5])
+            
+            clusters_info_parts.append(
+                f"Cluster ID: {c.cluster_id}\n"
+                f"- Label: {c.label}\n"
+                f"- Keywords: {keywords}\n"
+                f"- Samples: {sample_text}\n"
+            )
+        
+        prompt = BATCH_CLUSTER_RELEVANCE_PROMPT.format(
+            survey_title=survey_title,
+            ronten_context=context_str,
+            clusters_info="\n".join(clusters_info_parts)
+        )
+        
+        try:
+            response = await self.llm_client.generate(prompt)
+            
+            # Parse JSON list
+            json_start = response.find('[')
+            json_end = response.rfind(']') + 1
+            
+            results = []
+            if json_start >= 0 and json_end > json_start:
+                data_list = json.loads(response[json_start:json_end])
+                
+                # Create map of results by ID for easy lookup
+                result_data_map = {item.get("cluster_id"): item for item in data_list}
+                
+                for cluster in clusters:
+                    data = result_data_map.get(cluster.cluster_id)
+                    if data:
+                        results.append(ClusterFilterResult(
+                            cluster_id=cluster.cluster_id,
+                            cluster_label=cluster.label,
+                            cluster_size=cluster.size,
+                            is_relevant=data.get("relevant", True),
+                            filter_method="llm_check_batch",
+                            relevance_score=float(data.get("score", 0.5)),
+                            reason=data.get("reason", "LLM判定"),
+                            checked_samples=self.samples_to_check,
+                            related_ronten=data.get("related_ronten", ""),
+                        ))
+                    else:
+                        # Missing in response
+                        results.append(ClusterFilterResult(
+                            cluster_id=cluster.cluster_id,
+                            cluster_label=cluster.label,
+                            cluster_size=cluster.size,
+                            is_relevant=True,
+                            filter_method="llm_check_missing",
+                            relevance_score=0.5,
+                            reason="バッチ応答に含まれていません",
+                            checked_samples=self.samples_to_check,
+                        ))
+            else:
+                # JSON parsing failed completely
+                raise ValueError("No JSON list found in response")
+                
+            return results
+            
+        except Exception as e:
+            print(f"Batch cluster check failed: {e}")
+            # Fallback: mark all as relevant on error to be safe
+            return [
+                ClusterFilterResult(
+                    cluster_id=c.cluster_id,
+                    cluster_label=c.label,
+                    cluster_size=c.size,
+                    is_relevant=True,
+                    filter_method="llm_check_error",
+                    relevance_score=0.5,
+                    reason=f"バッチ処理エラー: {str(e)}",
+                    checked_samples=self.samples_to_check,
+                )
+                for c in clusters
+            ]
+
     async def _check_cluster_relevance(
         self,
         cluster: ClusterResult,
