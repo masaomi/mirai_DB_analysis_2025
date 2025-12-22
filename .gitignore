@@ -34,3 +34,5 @@ survey_report_viewer/.env.*
 survey_report_viewer/node_modules/
 survey_report_viewer/.next/
 
+test_depth_interview_ai_2025/
+multi_LLM_orchestration_2025/
